@@ -62,3 +62,16 @@ def register_pie_music_tools(mcp: FastMCP) -> None:
         me = get_music_engine()
         steps = me.generate_drums(drum_patterns)
         return {"steps": steps}
+
+    @mcp.tool()
+    def music_generate_from_external_model(model_type: str, prompt: str, length_beats: float = 16.0) -> dict[str, Any]:
+        """Fetch advanced MIDI sequences directly from external AI models (e.g. Magenta/Suno).
+
+        Args:
+            model_type: 'melody' or 'drum'
+            prompt: Text describing the musical intent (e.g., 'Complex jazz breakbeat')
+            length_beats: Target length in quarter notes.
+        """
+        from fl_studio_mcp.pie.music_llm import get_external_music_connector
+        connector = get_external_music_connector()
+        return connector.fetch_advanced_midi(model_type, prompt, length_beats)
