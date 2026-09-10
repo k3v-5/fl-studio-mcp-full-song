@@ -53,6 +53,85 @@ class ArrangementEngine:
             "bass_notes": offset_bass
         }
 
+    def generate_transition_riser(
+        self,
+        target_section_name: str,
+        length_beats: float = 16.0,
+        start_midi: int = 48,
+        end_midi: int = 72,
+        curve_type: str = "exponential"
+    ) -> dict[str, Any]:
+        """Compute an escalating MIDI transition sequence right before a section starts.
+
+        Args:
+            target_section_name: The section the riser leads into (e.g. 'drop').
+            length_beats: How long the riser should be in quarter notes.
+            start_midi: Starting MIDI pitch of the riser.
+            end_midi: Ending MIDI pitch of the riser.
+            curve_type: 'linear' or 'exponential' rhythmic acceleration.
+
+        Returns:
+            A dictionary containing the generated notes.
+        """
+        section = self.template_sections.get(target_section_name.lower())
+        if not section:
+            return {"error": f"Section {target_section_name} not found in template."}
+
+        # Calculate exactly where the riser should start so it ends precisely on the drop
+        target_beat = section.get("start_beat", 0.0)
+        start_beat = target_beat - length_beats
+
+        if start_beat < 0:
+            start_beat = 0.0
+            length_beats = target_beat
+
+        if length_beats <= 0:
+            return {"error": "Target section starts too early for a transition riser."}
+
+        notes = []
+        current_beat = start_beat
+        note_length = 1.0 # start with quarter notes
+
+        while current_beat < target_beat:
+            # Calculate progress (0.0 to 1.0)
+            progress = (current_beat - start_beat) / length_beats
+
+            # Interpolate pitch
+            current_pitch = int(start_midi + (end_midi - start_midi) * progress)
+
+            # Interpolate velocity (rise from 0.4 to 1.0)
+            current_velocity = 0.4 + (0.6 * progress)
+
+            # Clamp note length to avoid overshooting
+            actual_duration = min(note_length, target_beat - current_beat)
+
+            notes.append({
+                "midi": current_pitch,
+                "time": float(current_beat),
+                "duration": float(actual_duration),
+                "velocity": float(current_velocity)
+            })
+
+            current_beat += actual_duration
+
+            # Accelerate rhythm
+            if curve_type == "exponential":
+                if progress > 0.75:
+                    note_length = 0.125 # 32nd notes
+                elif progress > 0.5:
+                    note_length = 0.25 # 16th notes
+                elif progress > 0.25:
+                    note_length = 0.5 # 8th notes
+            # If linear, note_length remains 1.0 (quarter notes) or we could scale it smoothly.
+            # Keeping linear as constant quarters for simplicity of distinction.
+
+        return {
+            "target_section": target_section_name,
+            "start_beat": start_beat,
+            "length_beats": length_beats,
+            "riser_notes": notes
+        }
+
     def _apply_offset(self, notes: list[dict[str, Any]], offset: float) -> list[dict[str, Any]]:
         """Add the time offset to a list of MIDI note dictionaries."""
         shifted_notes = []

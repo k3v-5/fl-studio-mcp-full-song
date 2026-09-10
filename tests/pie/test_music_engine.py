@@ -42,3 +42,25 @@ def test_music_engine_bass_schema():
         assert isinstance(note["velocity"], float)
 
         assert 0.0 <= note["velocity"] <= 1.0
+
+def test_music_engine_humanize():
+    me = get_music_engine()
+    raw_notes = [{"midi": 60, "time": 1.0, "duration": 1.0, "velocity": 0.5}]
+
+    # Use zero variance to ensure baseline logic is stable
+    humanized = me.humanize_timing_and_velocity(raw_notes, timing_variance=0.0, velocity_variance=0.0)
+    assert humanized[0]["time"] == 1.0
+    assert humanized[0]["velocity"] == 0.5
+
+    # Test bounding/clamping
+    raw_bounds = [{"midi": 60, "time": 0.0, "duration": 0.01, "velocity": 0.0}]
+    humanized_bounds = me.humanize_timing_and_velocity(raw_bounds, timing_variance=0.0, velocity_variance=0.0)
+    # Velocity should be clamped to a min of 0.1
+    assert humanized_bounds[0]["velocity"] == 0.1
+    assert humanized_bounds[0]["time"] == 0.0
+
+    # Test random variation applied without crashing
+    humanized_rand = me.humanize_timing_and_velocity(raw_notes, timing_variance=10.0, velocity_variance=10.0)
+    assert 0.1 <= humanized_rand[0]["velocity"] <= 1.0
+    assert humanized_rand[0]["time"] >= 0.0
+    assert humanized_rand[0]["duration"] >= 0.01

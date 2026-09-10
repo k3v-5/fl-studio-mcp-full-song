@@ -70,3 +70,23 @@ def register_pie_arrangement_tools(mcp: FastMCP) -> None:
 
         # 3. Flush the queue
         return adapter.flush()
+
+    @mcp.tool()
+    def arrangement_generate_transition(
+        target_section_name: str,
+        length_beats: float = 16.0,
+        start_midi: int = 48,
+        end_midi: int = 72,
+        curve_type: str = "exponential"
+    ) -> dict[str, Any]:
+        """Generate a MIDI transition riser sequence.
+
+        Args:
+            target_section_name: The section to lead into (must be defined in template structure).
+            length_beats: Length in quarter notes.
+            start_midi: Start pitch.
+            end_midi: End pitch.
+            curve_type: 'exponential' or 'linear'.
+        """
+        ae = get_arrangement_engine()
+        return ae.generate_transition_riser(target_section_name, length_beats, start_midi, end_midi, curve_type)

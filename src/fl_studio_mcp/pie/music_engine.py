@@ -12,6 +12,34 @@ class MusicEngine:
     def __init__(self) -> None:
         pass
 
+    def humanize_timing_and_velocity(self, notes: list[dict[str, Any]], timing_variance: float = 0.02, velocity_variance: float = 0.1) -> list[dict[str, Any]]:
+        """Applies Gaussian noise to note timing, duration, and velocity to simulate human playing.
+
+        Args:
+            notes: A list of standard PIE note dicts (midi, time, duration, velocity).
+            timing_variance: The standard deviation for time and duration shifts (in quarter notes).
+            velocity_variance: The standard deviation for velocity shifts (0.0 to 1.0).
+
+        Returns:
+            A new list of humanized note dicts.
+        """
+        humanized = []
+        for note in notes:
+            h_note = note.copy()
+
+            # Apply gaussian noise to time and duration
+            h_note["time"] = max(0.0, h_note["time"] + random.gauss(0.0, timing_variance))
+            # Don't let duration become negative or 0
+            h_note["duration"] = max(0.01, h_note["duration"] + random.gauss(0.0, timing_variance))
+
+            # Apply gaussian noise to velocity and clamp between 0.1 and 1.0
+            new_vel = h_note["velocity"] + random.gauss(0.0, velocity_variance)
+            h_note["velocity"] = max(0.1, min(1.0, new_vel))
+
+            humanized.append(h_note)
+
+        return humanized
+
     def generate_harmony(self, chords: list[list[int]], durations: list[float], start_time: float = 0.0, base_velocity: float = 0.8) -> list[dict[str, Any]]:
         """Generates MIDI data based explicitly on arrays of midi notes provided by the AI.
 

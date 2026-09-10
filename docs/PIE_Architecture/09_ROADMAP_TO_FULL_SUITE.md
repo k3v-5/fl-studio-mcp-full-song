@@ -9,8 +9,8 @@ Este documento es un registro vivo de todo lo que falta por construir o mejorar 
 ## 1. Núcleo Musical y Generativo (Music & Arrangement)
 Actualmente, el LLM envía arreglos crudos y acordes a PIE. Podemos potenciar esto con herramientas especializadas:
 - [ ] **Integradora LLM Directa:** Crear una sub-herramienta que se conecte directamente a modelos musicales (como Suno, Magenta o herramientas de Audio-to-MIDI) para extraer teoría musical avanzada, en lugar de depender únicamente del razonamiento lógico del texto del LLM base.
-- [ ] **Librería de Ritmos (Groove Pool):** Implementar funciones de cuantización con *Swing*, *Micro-timing* y *Humanization* real. Que el MIDI Adapter no solo envíe notas perfectas a la grilla, sino que aplique ruido gaussiano a los tiempos (Phase 2).
-- [ ] **Generador de Transiciones (Transition Weaver):** Una herramienta que calcule automatizaciones de LOM (sweeps de filtro, pitch risers, noise sweeps) y las inyecte automáticamente en el `ArrangementEngine` para los 4 compases previos a un Drop.
+- [x] **Librería de Ritmos (Groove Pool):** Implementar funciones de cuantización con *Swing*, *Micro-timing* y *Humanization* real. Que el MIDI Adapter no solo envíe notas perfectas a la grilla, sino que aplique ruido gaussiano a los tiempos (Phase 2).
+- [x] **Generador de Transiciones (Transition Weaver):** Una herramienta que calcule automatizaciones de LOM (sweeps de filtro, pitch risers, noise sweeps) y las inyecte automáticamente en el `ArrangementEngine` para los 4 compases previos a un Drop.
 
 ## 2. Inyección MIDI y UI Automation (Path 1)
 El `MIDIAdapter` funciona y encola tareas mediante el atajo `Ctrl+Alt+Y`. Sin embargo, esto es un hack de interfaz de usuario.
