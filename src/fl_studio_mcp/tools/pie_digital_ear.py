@@ -18,19 +18,30 @@ def register_pie_digital_ear_tools(mcp: FastMCP) -> None:
         Args:
             duration: Duration in seconds to capture.
         """
+        import time
         dee = get_digital_ear_engine()
-        return dee.capture_audio(duration)
+        dee.start_capture()
+        time.sleep(duration)
+        return dee.stop_capture()
 
     @mcp.tool()
     def mix_analyze_masking(track_a: str, track_b: str) -> dict[str, Any]:
         """Analyze frequency masking between two tracks.
+
+        Note: Currently uses the global captured buffer as a mock instead of specific tracks
+        due to the single-channel limitation of the VST Interceptor prototype.
 
         Args:
             track_a: Name or ID of the first track.
             track_b: Name or ID of the second track.
         """
         dee = get_digital_ear_engine()
-        return dee.analyze_masking(track_a, track_b)
+        audio = dee.get_audio_array()
+        if len(audio) == 0:
+             return {"error": "No audio captured. Run audio_capture first."}
+
+        # Mock comparing two identical arrays for demonstration of the DSP logic
+        return dee.analyze_masking(audio, audio)
 
     @mcp.tool()
     def mix_apply_correction(track_id: int, frequency: float, q_factor: float, gain: float) -> str:
