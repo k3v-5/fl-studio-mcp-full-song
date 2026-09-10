@@ -29,6 +29,8 @@ from fl_studio_mcp.tools import (
 )
 from fl_studio_mcp.tools.pie_foundation import register_pie_foundation_tools
 from fl_studio_mcp.tools.pie_governance import register_pie_governance_tools
+from fl_studio_mcp.tools.pie_music import register_pie_music_tools
+from fl_studio_mcp.tools.pie_arrangement import register_pie_arrangement_tools
 from fl_studio_mcp.utils.connection import get_connection, reset_connection
 
 # Create the MCP server
@@ -144,6 +146,8 @@ register_plugin_tools(mcp)
 register_piano_roll_tools(mcp)
 register_pie_foundation_tools(mcp)
 register_pie_governance_tools(mcp)
+register_pie_music_tools(mcp)
+register_pie_arrangement_tools(mcp)
 
 
 def main():
