@@ -44,6 +44,30 @@ def register_pie_digital_ear_tools(mcp: FastMCP) -> None:
         return dee.analyze_masking(audio, audio)
 
     @mcp.tool()
+    def mix_apply_sidechain_ducking(masking_analysis: dict[str, Any], kick_times: list[float], sidechain_channel_id: int) -> dict[str, Any]:
+        """Automatically inject ghost notes to trigger ducking (sidechain) based on masking analysis.
+
+        Args:
+            masking_analysis: The dictionary returned by mix_analyze_masking.
+            kick_times: List of start times (in quarter notes) for the kick drum triggers.
+            sidechain_channel_id: The FL Studio channel ID designated as the Sidechain Trigger (Envelope Controller).
+        """
+        from fl_studio_mcp.pie.sidechain_engine import get_sidechain_engine
+        from fl_studio_mcp.pie.midi_adapter import get_midi_adapter
+
+        se = get_sidechain_engine()
+        result = se.process_masking_result(masking_analysis, kick_times)
+
+        if result.get("action") == "apply_sidechain":
+            adapter = get_midi_adapter()
+            adapter.queue_notes(sidechain_channel_id, result["ghost_notes"])
+            # Flush immediately to apply the curve
+            flush_res = adapter.flush()
+            result["flush_status"] = flush_res
+
+        return result
+
+    @mcp.tool()
     def mix_apply_correction(track_id: int, frequency: float, q_factor: float, gain: float) -> str:
         """Apply an EQ correction to fix a mix issue.
 
