@@ -18,17 +18,26 @@ class DigitalEarEngine:
         self.port = port
         self.is_capturing = False
         self.audio_buffer: list[float] = []
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(("127.0.0.1", self.port))
-        self.sock.settimeout(1.0)
+        self.sock: socket.socket | None = None
         self.sample_rate = 44100
+        self.listener_thread: threading.Thread | None = None
 
-        self.listener_thread = threading.Thread(target=self._listen_for_audio, daemon=True)
-        self.listener_thread.start()
+    def _init_socket(self) -> None:
+        """Bind socket lazily to avoid crash on import if port is busy."""
+        if not self.sock:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock.bind(("127.0.0.1", self.port))
+            self.sock.settimeout(1.0)
+
+            self.listener_thread = threading.Thread(target=self._listen_for_audio, daemon=True)
+            self.listener_thread.start()
 
     def _listen_for_audio(self):
         """Background thread to listen for UDP packets containing float32 audio."""
         while True:
+            if not self.sock:
+                break
+
             if not self.is_capturing:
                 # Just drain the socket if not capturing to prevent buffer bloat
                 try:
@@ -47,6 +56,7 @@ class DigitalEarEngine:
 
     def start_capture(self) -> str:
         """Start capturing audio from the VST Interceptor."""
+        self._init_socket()
         self.audio_buffer.clear()
         self.is_capturing = True
         return "Audio capture started."
