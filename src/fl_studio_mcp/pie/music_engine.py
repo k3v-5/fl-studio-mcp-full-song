@@ -24,10 +24,10 @@ class MusicEngine:
             base_midi = 60
 
         for chord in progression:
-            # Generate a triad for each chord
-            notes.append({"note": base_midi, "time": time_counter, "duration": duration_per_chord, "velocity": 100})
-            notes.append({"note": base_midi + 4, "time": time_counter, "duration": duration_per_chord, "velocity": 100})
-            notes.append({"note": base_midi + 7, "time": time_counter, "duration": duration_per_chord, "velocity": 100})
+            # Generate a triad for each chord (velocity scale 0.0 - 1.0)
+            notes.append({"midi": base_midi, "time": float(time_counter), "duration": float(duration_per_chord), "velocity": 0.8})
+            notes.append({"midi": base_midi + 4, "time": float(time_counter), "duration": float(duration_per_chord), "velocity": 0.8})
+            notes.append({"midi": base_midi + 7, "time": float(time_counter), "duration": float(duration_per_chord), "velocity": 0.8})
             time_counter += duration_per_chord
 
         return notes
@@ -41,11 +41,11 @@ class MusicEngine:
         if rhythm_pattern == "driving":
             for root in root_notes:
                 for _ in range(8):
-                    notes.append({"note": root - 12, "time": time_counter, "duration": 0.5, "velocity": 110})
+                    notes.append({"midi": root - 12, "time": float(time_counter), "duration": 0.5, "velocity": 0.9})
                     time_counter += 0.5
         else:
              for root in root_notes:
-                notes.append({"note": root - 12, "time": time_counter, "duration": 4.0, "velocity": 110})
+                notes.append({"midi": root - 12, "time": float(time_counter), "duration": 4.0, "velocity": 0.9})
                 time_counter += 4.0
 
         return notes
