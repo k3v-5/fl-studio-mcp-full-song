@@ -12,56 +12,74 @@ class MusicEngine:
     def __init__(self) -> None:
         pass
 
-    def generate_harmony(self, scale: str, progression: list[str], length: int) -> list[dict[str, Any]]:
-        """Mock harmony generator."""
+    def generate_harmony(self, chords: list[list[int]], durations: list[float], start_time: float = 0.0, base_velocity: float = 0.8) -> list[dict[str, Any]]:
+        """Generates MIDI data based explicitly on arrays of midi notes provided by the AI.
+
+        Args:
+            chords: List of chords, where each chord is a list of MIDI note integers (e.g. [[60, 64, 67], [62, 65, 69]]).
+            durations: The duration in quarter notes for each chord (must match length of chords).
+            start_time: Starting offset.
+            base_velocity: Base velocity for the notes.
+        """
         notes = []
-        time_counter = 0.0
-        duration_per_chord = length / max(1, len(progression))
+        time_counter = start_time
 
-        # Simple mock mapping
-        base_midi = 60 # Middle C
-        if "minor" in scale.lower():
-            base_midi = 60
+        if len(chords) != len(durations):
+            raise ValueError("Length of chords and durations must match.")
 
-        for chord in progression:
-            # Generate a triad for each chord (velocity scale 0.0 - 1.0)
-            notes.append({"midi": base_midi, "time": float(time_counter), "duration": float(duration_per_chord), "velocity": 0.8})
-            notes.append({"midi": base_midi + 4, "time": float(time_counter), "duration": float(duration_per_chord), "velocity": 0.8})
-            notes.append({"midi": base_midi + 7, "time": float(time_counter), "duration": float(duration_per_chord), "velocity": 0.8})
-            time_counter += duration_per_chord
+        for i, chord in enumerate(chords):
+            duration = durations[i]
+            for midi_note in chord:
+                notes.append({
+                    "midi": midi_note,
+                    "time": float(time_counter),
+                    "duration": float(duration),
+                    "velocity": float(base_velocity)
+                })
+            time_counter += duration
 
         return notes
 
-    def generate_bass(self, root_notes: list[int], rhythm_pattern: str) -> list[dict[str, Any]]:
-        """Mock bassline generator."""
-        notes = []
-        time_counter = 0.0
+    def generate_bass(self, midi_sequence: list[int], durations: list[float], start_time: float = 0.0, base_velocity: float = 0.9) -> list[dict[str, Any]]:
+        """Generates bassline MIDI data explicitly from AI-provided sequences.
 
-        # Simple driving 8th note rhythm
-        if rhythm_pattern == "driving":
-            for root in root_notes:
-                for _ in range(8):
-                    notes.append({"midi": root - 12, "time": float(time_counter), "duration": 0.5, "velocity": 0.9})
-                    time_counter += 0.5
-        else:
-             for root in root_notes:
-                notes.append({"midi": root - 12, "time": float(time_counter), "duration": 4.0, "velocity": 0.9})
-                time_counter += 4.0
+        Args:
+            midi_sequence: List of MIDI root notes.
+            durations: Duration of each note.
+            start_time: Starting offset.
+            base_velocity: Velocity for the notes.
+        """
+        notes = []
+        time_counter = start_time
+
+        if len(midi_sequence) != len(durations):
+            raise ValueError("Length of midi_sequence and durations must match.")
+
+        for i, midi_note in enumerate(midi_sequence):
+            duration = durations[i]
+            notes.append({
+                "midi": midi_note,
+                "time": float(time_counter),
+                "duration": float(duration),
+                "velocity": float(base_velocity)
+            })
+            time_counter += duration
 
         return notes
 
-    def generate_drums(self, genre: str, intensity: float) -> list[dict[str, Any]]:
-        """Mock drum generator specifically formatted for step sequencer (grid bits)."""
-        # Returns a list of steps to activate on channels
-        # For FL Studio, step sequencers are often updated channel by channel
+    def generate_drums(self, drum_patterns: dict[str, list[bool]]) -> list[dict[str, Any]]:
+        """Accepts explicit boolean arrays (grid bits) for drum sequences directly from the AI.
+
+        Args:
+            drum_patterns: A dict mapping channel identifiers (or standard instrument names)
+                           to their explicit boolean step arrays (e.g. {"kick": [True, False, False, False]}).
+        """
         steps = []
-        if genre.lower() == "house":
-            # 4 on the floor kick
-            steps.append({"instrument": "kick", "grid_bits": [True, False, False, False] * 4})
-            # Hats on off-beats
-            steps.append({"instrument": "hat", "grid_bits": [False, False, True, False] * 4})
-            # Snare/Clap on 2 and 4
-            steps.append({"instrument": "snare", "grid_bits": [False, False, False, False, True, False, False, False, False, False, False, False, True, False, False, False]})
+        for instrument, grid_bits in drum_patterns.items():
+            steps.append({
+                "instrument": instrument,
+                "grid_bits": grid_bits
+            })
 
         return steps
 

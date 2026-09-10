@@ -3,9 +3,12 @@ from fl_studio_mcp.pie.music_engine import get_music_engine
 
 def test_music_engine_harmony_schema():
     me = get_music_engine()
-    notes = me.generate_harmony("C minor", ["i", "iv"], length=4)
+    chords = [[60, 64, 67], [65, 69, 72]]
+    durations = [2.0, 2.0]
 
-    assert len(notes) > 0
+    notes = me.generate_harmony(chords, durations, start_time=0.0)
+
+    assert len(notes) == 6
     # Check that EVERY note strictly matches the fl_send_notes schema
     for note in notes:
         assert "midi" in note
@@ -24,9 +27,9 @@ def test_music_engine_harmony_schema():
 
 def test_music_engine_bass_schema():
     me = get_music_engine()
-    notes = me.generate_bass([60, 65], "driving")
+    notes = me.generate_bass([60, 65], [1.0, 1.0])
 
-    assert len(notes) > 0
+    assert len(notes) == 2
     for note in notes:
         assert "midi" in note
         assert "duration" in note

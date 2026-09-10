@@ -9,31 +9,41 @@ from typing import Any
 
 class PolicyEngine:
     def __init__(self) -> None:
-        pass
+        self.rules: list[dict[str, Any]] = []
+
+    def set_rules(self, rules: list[dict[str, Any]]) -> dict[str, Any]:
+        """Allow the AI to dynamically set the policy rules.
+
+        Example rule:
+        {
+            "action": "set_track_volume",
+            "condition": "greater_than",
+            "param": "volume",
+            "value": 0.8,
+            "message": "Volume exceeds 0.8 safe limit."
+        }
+        """
+        self.rules = rules
+        return {"status": "success", "rules_loaded": len(self.rules)}
 
     def validate_action(self, action_type: str, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate if an action adheres to PIE policies.
+        """Validate an action dynamically against the AI-defined rule list."""
+        for rule in self.rules:
+            if rule.get("action") == action_type:
+                target_param = rule.get("param")
+                if target_param in params:
+                    val = params[target_param]
+                    cond = rule.get("condition")
+                    threshold = rule.get("value")
 
-        Returns a dict: {"valid": bool, "reason": str}
-        """
-        if action_type == "set_track_volume":
-            volume = params.get("volume", 0.0)
-            # 0.8 in FL roughly corresponds to 0dBFS. Prevent pushing faders past this.
-            if volume > 0.8:
-                return {
-                    "valid": False,
-                    "reason": f"Policy Violation (Gain Staging): Requested volume {volume} exceeds safe limit of 0.8 (0dBFS). Use compression instead."
-                }
-
-        if action_type == "set_track_pan":
-            # For demonstration: If the track name suggests it's a Sub Bass, enforce mono.
-            track_name = params.get("track_name", "").upper()
-            pan = params.get("pan", 0.0)
-            if "SUB" in track_name and pan != 0.0:
-                return {
-                    "valid": False,
-                    "reason": "Policy Violation (Safe Panning): Sub-bass tracks must remain in strict mono (pan = 0.0)."
-                }
+                    if cond == "greater_than" and val > threshold:
+                        return {"valid": False, "reason": rule.get("message", "Policy violation.")}
+                    elif cond == "less_than" and val < threshold:
+                        return {"valid": False, "reason": rule.get("message", "Policy violation.")}
+                    elif cond == "equals" and val == threshold:
+                        return {"valid": False, "reason": rule.get("message", "Policy violation.")}
+                    elif cond == "not_equals" and val != threshold:
+                        return {"valid": False, "reason": rule.get("message", "Policy violation.")}
 
         return {"valid": True, "reason": "Passed."}
 

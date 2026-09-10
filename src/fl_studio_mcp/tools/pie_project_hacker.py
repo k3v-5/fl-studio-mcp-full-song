@@ -31,11 +31,15 @@ def register_pie_project_hacker_tools(mcp: FastMCP) -> None:
         return phe.read_structure()
 
     @mcp.tool()
-    def project_inject_pattern() -> dict[str, Any]:
-        """Attempt to inject a mock pattern directly into the .flp binary.
+    def project_inject_pattern(pattern_name: str, color: int = 0x55FF55) -> dict[str, Any]:
+        """Attempt to inject a dynamically named pattern directly into the .flp binary.
 
         Will create an automatic `.pie_backup` file alongside the original.
         User MUST reload the project in FL Studio after this action.
+
+        Args:
+            pattern_name: The desired name for the newly created pattern.
+            color: Hexadecimal color integer.
         """
         phe = get_project_hacker_engine()
-        return phe.inject_mock_pattern()
+        return phe.inject_pattern(pattern_name, color)

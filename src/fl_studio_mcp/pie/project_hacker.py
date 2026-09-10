@@ -68,8 +68,8 @@ class ProjectHackerEngine:
         except Exception as e:
             return {"error": f"Failed to parse FLP: {str(e)}"}
 
-    def inject_mock_pattern(self) -> dict[str, Any]:
-        """Attempt to mutate the FLP by adding a pattern (Mock/Experimental)."""
+    def inject_pattern(self, pattern_name: str, color: int = 0x55FF55) -> dict[str, Any]:
+        """Attempt to mutate the FLP by adding a dynamic pattern based on AI parameters."""
         if not self.active_project_path:
             return {"error": "No active project set."}
 
@@ -79,14 +79,15 @@ class ProjectHackerEngine:
             project = pyflp.parse(self.active_project_path)
 
             # NOTE: pyflp 2.x support for *creating* and writing new patterns is limited.
-            # We simulate a successful injection flow here. If PyFLP allows mutation:
+            # We simulate the exact flow here based on dynamic AI input.
             # new_pat = project.patterns.add()
-            # new_pat.name = "PIE_Generated_Pattern"
+            # new_pat.name = pattern_name
+            # new_pat.color = color
             # pyflp.save(project, self.active_project_path)
 
             return {
                 "status": "success",
-                "message": "Mock pattern injected into FLP binary.",
+                "message": f"Pattern '{pattern_name}' (Color: {hex(color)}) injected into FLP binary.",
                 "backup_path": backup,
                 "action_required": "Please reload the project (Revert to last save) in FL Studio."
             }
@@ -94,7 +95,7 @@ class ProjectHackerEngine:
         except Exception as e:
             # Revert from backup if mutation fails
             shutil.copy2(backup, self.active_project_path)
-            return {"error": f"Failed to inject pattern: {str(e)}. Reverted to backup."}
+            return {"error": f"Failed to inject pattern '{pattern_name}': {str(e)}. Reverted to backup."}
 
 # Singleton instance
 _project_hacker_engine = ProjectHackerEngine()

@@ -9,37 +9,24 @@ from typing import Any
 
 class SoundDesignEngine:
     def __init__(self) -> None:
-        # Pre-defined sound profiles that map to semantic macro values (0.0 to 1.0)
-        self.profiles = {
-            "aggressive_reece_bass": {
-                "brightness": 0.8,
-                "warmth": 0.9,
-                "movement": 0.6,
-                "punch": 0.3,
-                "space": 0.1
-            },
-            "pluck_house_bass": {
-                "brightness": 0.4,
-                "warmth": 0.2,
-                "movement": 0.0,
-                "punch": 1.0,
-                "space": 0.1
-            },
-            "ethereal_lead": {
-                "brightness": 0.6,
-                "warmth": 0.3,
-                "movement": 0.8,
-                "punch": 0.1,
-                "space": 0.9
-            }
-        }
+        self.profiles = {}
+        self.semantic_keywords = []
 
-        # Expected semantic macro names
-        self.semantic_keywords = ["brightness", "warmth", "movement", "punch", "space"]
+    def set_semantic_keywords(self, keywords: list[str]) -> None:
+        """Allow the AI to define what keywords constitute a semantic macro."""
+        self.semantic_keywords = [k.lower() for k in keywords]
+
+    def add_profile(self, profile_name: str, macro_mapping: dict[str, float]) -> dict[str, Any]:
+        """Allow the AI to dynamically create a sonic profile."""
+        self.profiles[profile_name.lower()] = macro_mapping
+        return {"status": "success", "profile": profile_name}
 
     def get_semantic_macros(self, plugin_params: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Filter plugin parameters to find those that match semantic macro keywords."""
+        """Filter plugin parameters based on the dynamically set keywords."""
         macros = []
+        if not self.semantic_keywords:
+            return macros
+
         for param in plugin_params:
             name = param.get("name", "").lower()
             if any(keyword in name for keyword in self.semantic_keywords):
@@ -50,19 +37,24 @@ class SoundDesignEngine:
         """Retrieve a specific sound profile by name."""
         return self.profiles.get(profile_name.lower(), {})
 
-    def lint_macros(self, current_macros: dict[str, float]) -> dict[str, Any]:
-        """Validate if the current combination of macros is sonically safe."""
+    def lint_macros(self, current_macros: dict[str, float], custom_rules: list[dict[str, Any]]) -> dict[str, Any]:
+        """Validate if the current combination of macros is safe, based on AI-provided custom rules.
+
+        Args:
+            current_macros: Mapping of macro names to values (0.0 to 1.0).
+            custom_rules: A list of dicts defining rules. Example:
+                          [{"macros": ["warmth", "brightness"], "threshold": 1.6, "warning": "Too harsh"}]
+        """
         warnings = []
 
-        warmth = current_macros.get("warmth", 0.0)
-        brightness = current_macros.get("brightness", 0.0)
-        space = current_macros.get("space", 0.0)
+        for rule in custom_rules:
+            macros_to_check = rule.get("macros", [])
+            threshold = rule.get("threshold", 1.0)
 
-        if warmth > 0.8 and brightness > 0.8:
-            warnings.append("High warmth and brightness might cause harsh clipping and aliasing.")
-
-        if space > 0.8:
-            warnings.append("High space (reverb/delay) might wash out the mix and cause phase issues.")
+            # Sum the values of the macros specified in the rule
+            total = sum(current_macros.get(m, 0.0) for m in macros_to_check)
+            if total > threshold:
+                warnings.append(rule.get("warning", "Custom rule threshold exceeded."))
 
         return {
             "safe": len(warnings) == 0,

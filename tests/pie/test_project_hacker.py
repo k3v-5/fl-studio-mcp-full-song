@@ -49,11 +49,11 @@ def test_project_hacker_read_structure(mock_parse):
 
 @patch("fl_studio_mcp.pie.project_hacker.pyflp.parse")
 @patch("fl_studio_mcp.pie.project_hacker.shutil.copy2")
-def test_project_hacker_inject_mock(mock_copy, mock_parse):
+def test_project_hacker_inject_pattern(mock_copy, mock_parse):
     engine = ProjectHackerEngine()
     engine.active_project_path = "/mock/path.flp"
 
-    res = engine.inject_mock_pattern()
+    res = engine.inject_pattern("Test Pattern", 0xFF00FF)
 
     assert res.get("status") == "success"
     assert res["backup_path"] == "/mock/path.flp.pie_backup"

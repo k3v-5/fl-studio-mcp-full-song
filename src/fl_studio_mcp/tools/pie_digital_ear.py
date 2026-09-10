@@ -47,33 +47,25 @@ def register_pie_digital_ear_tools(mcp: FastMCP) -> None:
     def mix_apply_correction(track_id: int, frequency: float, q_factor: float, gain: float) -> str:
         """Apply an EQ correction to fix a mix issue.
 
+        Note: Since the physical engine relies on the global fl_set_plugin_param_value,
+        this tool instructs the LLM on exactly how to use the underlying API to fix the mix.
+
         Args:
             track_id: Mixer track ID.
             frequency: Target frequency in Hz.
             q_factor: Bandwidth Q factor.
             gain: Gain in dB.
         """
-        dee = get_digital_ear_engine()
-        return dee.apply_correction(track_id, frequency, q_factor, gain)
+        return f"To apply {gain}dB at {frequency}Hz on track {track_id}, use fl_set_plugin_param_value on the EQ plugin indices."
 
     @mcp.tool()
-    def master_readiness() -> dict[str, Any]:
-        """Measure the LUFS and True Peak of the master bus."""
+    def master_readiness(target_lufs: float = -9.0, target_true_peak: float = -1.0) -> dict[str, Any]:
+        """Measure the LUFS and True Peak of the master bus against AI-provided targets."""
         dee = get_digital_ear_engine()
-        return dee.measure_readiness()
+        return dee.measure_readiness(target_lufs, target_true_peak)
 
     @mcp.tool()
-    def master_apply_target(target_lufs: float) -> str:
-        """Attempt to hit the target LUFS by adjusting the Master Limiter.
-
-        Args:
-            target_lufs: Desired LUFS level (e.g., -9.0).
-        """
+    def forensics_report(dc_offset_threshold: float = 0.05, clipping_threshold_db: float = 0.0) -> dict[str, Any]:
+        """Generate a low-level DSP diagnostic report for phase and clipping using AI-provided thresholds."""
         dee = get_digital_ear_engine()
-        return dee.apply_master_target(target_lufs)
-
-    @mcp.tool()
-    def forensics_report() -> dict[str, Any]:
-        """Generate a low-level DSP diagnostic report for phase and clipping."""
-        dee = get_digital_ear_engine()
-        return dee.generate_forensics_report()
+        return dee.generate_forensics_report(dc_offset_threshold, clipping_threshold_db)

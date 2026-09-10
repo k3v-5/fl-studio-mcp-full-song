@@ -12,40 +12,51 @@ def register_pie_arrangement_tools(mcp: FastMCP) -> None:
     from fl_studio_mcp.pie.arrangement import get_arrangement_engine
 
     @mcp.tool()
-    def arrangement_get_structure() -> dict[str, Any]:
-        """Get the macro-structure bounds from the Smart Template.
+    def arrangement_update_structure(template_definition: dict[str, dict[str, Any]]) -> dict[str, Any]:
+        """Update the macro-structure bounds from the Smart Template dynamically.
 
-        Returns the start beat, length, and intended energy for each section.
+        Args:
+            template_definition: A dict mapping section names to their configs.
+                                 e.g., {"intro": {"start_beat": 0, "length_beats": 64}}
         """
+        ae = get_arrangement_engine()
+        return ae.update_structure(template_definition)
+
+    @mcp.tool()
+    def arrangement_get_structure() -> dict[str, Any]:
+        """Get the current dynamically defined macro-structure."""
         ae = get_arrangement_engine()
         return ae.get_structure()
 
     @mcp.tool()
-    def arrangement_generate_section(section_name: str, chord_prog: list[str]) -> dict[str, Any]:
-        """Generate full MIDI data for an entire section in the template.
-
-        Args:
-            section_name: Name of the section (e.g., 'drop', 'build')
-            chord_prog: Chord progression to base the section on
+    def arrangement_generate_section(
+        section_name: str,
+        chords: list[list[int]],
+        chord_durations: list[float],
+        bass_midi: list[int],
+        bass_durations: list[float]
+    ) -> dict[str, Any]:
+        """Generate full MIDI data for an entire section in the template using dynamic inputs.
         """
         ae = get_arrangement_engine()
-        return ae.generate_section(section_name, chord_prog)
+        return ae.generate_section(section_name, chords, chord_durations, bass_midi, bass_durations)
 
     @mcp.tool()
-    def arrangement_execute_section(section_name: str, chord_prog: list[str], harmony_channel_id: int, bass_channel_id: int) -> dict[str, Any]:
-        """Generate AND execute a section directly into FL Studio.
-
-        Args:
-            section_name: Name of the section (e.g., 'drop', 'build').
-            chord_prog: Chord progression to base the section on.
-            harmony_channel_id: FL Studio channel index for the harmony/chords.
-            bass_channel_id: FL Studio channel index for the bassline.
-        """
+    def arrangement_execute_section(
+        section_name: str,
+        chords: list[list[int]],
+        chord_durations: list[float],
+        bass_midi: list[int],
+        bass_durations: list[float],
+        harmony_channel_id: int,
+        bass_channel_id: int
+    ) -> dict[str, Any]:
+        """Generate AND execute a dynamically provided section directly into FL Studio."""
         ae = get_arrangement_engine()
         from fl_studio_mcp.pie.midi_adapter import get_midi_adapter
 
         # 1. Generate logical data
-        section_data = ae.generate_section(section_name, chord_prog)
+        section_data = ae.generate_section(section_name, chords, chord_durations, bass_midi, bass_durations)
         if "error" in section_data:
             return section_data
 
@@ -57,5 +68,5 @@ def register_pie_arrangement_tools(mcp: FastMCP) -> None:
         if "bass_notes" in section_data and section_data["bass_notes"]:
             adapter.queue_notes(bass_channel_id, section_data["bass_notes"])
 
-        # 3. Flush the queue (triggers piano roll hotkeys in FL Studio)
+        # 3. Flush the queue
         return adapter.flush()

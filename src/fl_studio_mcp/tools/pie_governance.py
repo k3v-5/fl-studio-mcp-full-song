@@ -33,8 +33,14 @@ def register_pie_governance_tools(mcp: FastMCP) -> None:
             return f"Failed to add intent: {e}"
 
     @mcp.tool()
+    def policy_set_rules(rules: list[dict[str, Any]]) -> dict[str, Any]:
+        """Allow the AI to dynamically set the policy engine rules."""
+        engine = get_policy_engine()
+        return engine.set_rules(rules)
+
+    @mcp.tool()
     def production_validate(action_type: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Validate a proposed action against PIE guardrails.
+        """Validate a proposed action against dynamic AI-provided PIE guardrails.
 
         Args:
             action_type: The type of action (e.g., 'set_track_volume', 'set_track_pan')

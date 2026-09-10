@@ -92,17 +92,12 @@ class DigitalEarEngine:
 
         return {
             "masking_detected": masking,
-            "conflict_zone_hz": [conflict_hz - 10, conflict_hz + 10],
-            "recommendation": f"Potential masking at {conflict_hz:.1f}Hz. Consider cutting or sidechaining."
+            "conflict_zone_hz": [conflict_hz - 10, conflict_hz + 10]
         }
 
-    def apply_correction(self, track_id: int, frequency: float, q_factor: float, gain: float) -> str:
-        """Mock correcting a mix issue via a pre-mapped EQ on the template."""
-        return f"Applied EQ correction on track {track_id}: {gain}dB at {frequency}Hz (Q: {q_factor})"
-
     # Phase 6: Mastering
-    def measure_readiness(self) -> dict[str, Any]:
-        """Real LUFS measurement using pyloudnorm."""
+    def measure_readiness(self, target_lufs: float = -9.0, target_true_peak: float = -1.0) -> dict[str, Any]:
+        """Real LUFS measurement using pyloudnorm, accepting AI-provided targets."""
         audio = self.get_audio_array()
         if len(audio) == 0:
             return {"error": "No audio captured in buffer."}
@@ -118,26 +113,33 @@ class DigitalEarEngine:
             return {
                 "current_lufs": float(lufs),
                 "current_true_peak": float(true_peak_db),
-                "target_lufs": -9.0,
-                "target_true_peak": -1.0,
-                "status": "NEEDS_LIMITING" if lufs < -10.0 else "READY"
+                "target_lufs": target_lufs,
+                "target_true_peak": target_true_peak,
+                "status": "NEEDS_LIMITING" if lufs < target_lufs else "READY"
             }
         except ValueError:
             return {"error": "Audio segment too short for LUFS measurement (needs >= 400ms)."}
 
-    def apply_master_target(self, target_lufs: float) -> str:
-        """Mock pushing the limiter macro to hit the target LUFS."""
-        return f"Adjusted Master Limiter gain by +5.5dB to attempt hitting {target_lufs} LUFS."
-
     # Phase 7: Forensics
-    def generate_forensics_report(self) -> dict[str, Any]:
-        """Mock low-level DSP anomaly detection."""
+    def generate_forensics_report(self, dc_offset_threshold: float = 0.05, clipping_threshold_db: float = 0.0) -> dict[str, Any]:
+        """Real low-level DSP anomaly detection based on AI thresholds."""
+        audio = self.get_audio_array()
+        if len(audio) == 0:
+            return {"error": "No audio captured."}
+
+        dc_offset = float(np.mean(audio))
+        true_peak = float(np.max(np.abs(audio)))
+        true_peak_db = 20 * np.log10(true_peak) if true_peak > 0 else -100.0
+
+        has_dc = abs(dc_offset) > dc_offset_threshold
+        has_clipping = true_peak_db > clipping_threshold_db
+
         return {
-            "phase_correlation": 0.85, # Good
-            "dc_offset_detected": False,
-            "intersample_clipping_events": 0,
-            "aliasing_detected": False,
-            "verdict": "Audio is mathematically clean."
+            "dc_offset_value": dc_offset,
+            "dc_offset_detected": has_dc,
+            "true_peak_db": true_peak_db,
+            "clipping_detected": has_clipping,
+            "verdict": "Audio requires fixing." if (has_dc or has_clipping) else "Audio is mathematically clean."
         }
 
 # Singleton instance

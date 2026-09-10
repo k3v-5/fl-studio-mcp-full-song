@@ -10,32 +10,37 @@ from fl_studio_mcp.pie.music_engine import get_music_engine
 
 class ArrangementEngine:
     def __init__(self) -> None:
-        # Default smart template layout (mock)
-        # Assumes a 128 BPM track where each section is 16 bars long (64 beats)
-        self.template_sections = {
-            "intro": {"start_beat": 0, "length_beats": 64, "energy_level": 0.2},
-            "verse": {"start_beat": 64, "length_beats": 64, "energy_level": 0.5},
-            "build": {"start_beat": 128, "length_beats": 64, "energy_level": 0.8},
-            "drop": {"start_beat": 192, "length_beats": 64, "energy_level": 1.0},
-            "outro": {"start_beat": 256, "length_beats": 64, "energy_level": 0.1},
-        }
+        self.template_sections = {}
+
+    def update_structure(self, template_definition: dict[str, dict[str, Any]]) -> dict[str, Any]:
+        """Allow the AI assistant to define the template sections dynamically."""
+        self.template_sections = template_definition
+        return {"status": "success", "sections_loaded": len(self.template_sections)}
 
     def get_structure(self) -> dict[str, Any]:
         """Return the layout of the current Smart Template."""
+        if not self.template_sections:
+            return {"warning": "No template structure defined. Use update_structure first."}
         return self.template_sections
 
-    def generate_section(self, section_name: str, chord_prog: list[str]) -> dict[str, Any]:
-        """Generate MIDI data for an entire section and calculate the time offsets."""
+    def generate_section(
+        self,
+        section_name: str,
+        chords: list[list[int]],
+        chord_durations: list[float],
+        bass_midi: list[int],
+        bass_durations: list[float]
+    ) -> dict[str, Any]:
+        """Generate MIDI data for an entire section using AI-provided notes and durations."""
         section = self.template_sections.get(section_name.lower())
         if not section:
             return {"error": f"Section {section_name} not found in template."}
 
         me = get_music_engine()
-        start_offset = section["start_beat"]
+        start_offset = section.get("start_beat", 0.0)
 
-        # Generate raw music parts (they start at time=0.0 relative to the section)
-        raw_harmony = me.generate_harmony("C minor", chord_prog, 16)
-        raw_bass = me.generate_bass([60, 60, 60, 60], "driving" if section["energy_level"] > 0.5 else "sustained")
+        raw_harmony = me.generate_harmony(chords, chord_durations, start_time=0.0)
+        raw_bass = me.generate_bass(bass_midi, bass_durations, start_time=0.0)
 
         # Apply the time offset so they land in the correct part of the FL Studio playlist
         offset_harmony = self._apply_offset(raw_harmony, start_offset)

@@ -23,12 +23,21 @@ def register_pie_sound_design_tools(mcp: FastMCP) -> None:
         return {"semantic_macros": macros}
 
     @mcp.tool()
-    def sound_apply_profile(profile_name: str) -> dict[str, Any]:
-        """Get the macro values for a specific predefined sound profile.
+    def sound_set_semantic_keywords(keywords: list[str]) -> str:
+        """Allow the AI to dynamically define what keywords to look for when hunting for macros."""
+        sde = get_sound_design_engine()
+        sde.set_semantic_keywords(keywords)
+        return "Keywords updated successfully."
 
-        Args:
-            profile_name: Name of the profile (e.g., 'aggressive_reece_bass').
-        """
+    @mcp.tool()
+    def sound_add_profile(profile_name: str, macro_mapping: dict[str, float]) -> dict[str, Any]:
+        """Create a new dynamically defined sound profile."""
+        sde = get_sound_design_engine()
+        return sde.add_profile(profile_name, macro_mapping)
+
+    @mcp.tool()
+    def sound_apply_profile(profile_name: str) -> dict[str, Any]:
+        """Get the macro values for a dynamically defined sound profile."""
         sde = get_sound_design_engine()
         profile = sde.get_profile(profile_name)
         if not profile:
@@ -45,11 +54,8 @@ def register_pie_sound_design_tools(mcp: FastMCP) -> None:
         return f"To set '{macro_name}' to {value}, use fl_set_plugin_param_value with the parameter's index."
 
     @mcp.tool()
-    def sound_lint(current_macros: dict[str, float]) -> dict[str, Any]:
-        """Analyze current macro values to prevent sonic issues (clipping, phase).
-
-        Args:
-            current_macros: A dictionary mapping macro names (e.g., 'warmth') to their values (0.0 - 1.0).
+    def sound_lint(current_macros: dict[str, float], custom_rules: list[dict[str, Any]]) -> dict[str, Any]:
+        """Analyze current macro values based on AI-provided custom rules to prevent sonic issues.
         """
         sde = get_sound_design_engine()
-        return sde.lint_macros(current_macros)
+        return sde.lint_macros(current_macros, custom_rules)

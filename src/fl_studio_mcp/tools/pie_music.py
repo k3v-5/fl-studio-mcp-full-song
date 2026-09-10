@@ -12,38 +12,40 @@ def register_pie_music_tools(mcp: FastMCP) -> None:
     from fl_studio_mcp.pie.music_engine import get_music_engine
 
     @mcp.tool()
-    def music_generate_harmony(scale: str, progression: list[str], length: int) -> dict[str, Any]:
-        """Generate MIDI data for a chord progression.
+    def music_generate_harmony(chords: list[list[int]], durations: list[float], start_time: float = 0.0, base_velocity: float = 0.8) -> dict[str, Any]:
+        """Generate MIDI data for a harmony.
 
         Args:
-            scale: Musical scale (e.g., 'C minor')
-            progression: List of chords (e.g., ['i', 'iv', 'v', 'i'])
-            length: Duration in beats for the whole progression
+            chords: List of chords, where each chord is a list of MIDI note integers (e.g. [[60, 64, 67], [62, 65, 69]]).
+            durations: The duration in quarter notes for each chord (must match length of chords).
+            start_time: Starting offset.
+            base_velocity: Base velocity (0.0 to 1.0).
         """
         me = get_music_engine()
-        notes = me.generate_harmony(scale, progression, length)
+        notes = me.generate_harmony(chords, durations, start_time, base_velocity)
         return {"notes": notes}
 
     @mcp.tool()
-    def music_generate_bass(root_notes: list[int], rhythm_pattern: str) -> dict[str, Any]:
+    def music_generate_bass(midi_sequence: list[int], durations: list[float], start_time: float = 0.0, base_velocity: float = 0.9) -> dict[str, Any]:
         """Generate MIDI data for a bassline.
 
         Args:
-            root_notes: List of MIDI note numbers for the roots
-            rhythm_pattern: Type of rhythm ('driving', 'sustained')
+            midi_sequence: List of MIDI root notes.
+            durations: Duration of each note.
+            start_time: Starting offset.
+            base_velocity: Velocity (0.0 to 1.0).
         """
         me = get_music_engine()
-        notes = me.generate_bass(root_notes, rhythm_pattern)
+        notes = me.generate_bass(midi_sequence, durations, start_time, base_velocity)
         return {"notes": notes}
 
     @mcp.tool()
-    def music_generate_drums(genre: str, intensity: float) -> dict[str, Any]:
+    def music_generate_drums(drum_patterns: dict[str, list[bool]]) -> dict[str, Any]:
         """Generate grid bits for a drum pattern.
 
         Args:
-            genre: Musical genre (e.g., 'house')
-            intensity: 0.0 to 1.0 driving the complexity of the beat
+            drum_patterns: Dict mapping channel names to boolean arrays (e.g. {"kick": [True, False, False, False]}).
         """
         me = get_music_engine()
-        steps = me.generate_drums(genre, intensity)
+        steps = me.generate_drums(drum_patterns)
         return {"steps": steps}
