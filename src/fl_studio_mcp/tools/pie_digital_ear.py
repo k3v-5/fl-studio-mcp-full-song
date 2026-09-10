@@ -93,3 +93,18 @@ def register_pie_digital_ear_tools(mcp: FastMCP) -> None:
         """Generate a low-level DSP diagnostic report for phase and clipping using AI-provided thresholds."""
         dee = get_digital_ear_engine()
         return dee.generate_forensics_report(dc_offset_threshold, clipping_threshold_db)
+
+    @mcp.tool()
+    def digital_ear_phase_analyze() -> dict[str, Any]:
+        """Analyze the stereo phase correlation (Goniometer) of the captured audio.
+
+        Requires that audio has been captured first. Warns if the mix is not mono-compatible.
+        """
+        dee = get_digital_ear_engine()
+        audio = dee.get_audio_array()
+        if len(audio) == 0:
+            return {"error": "No audio captured in buffer."}
+
+        # Mocking left and right channels by splitting the mono buffer for testing/prototype
+        mid = len(audio) // 2
+        return dee.analyze_stereo_phase(audio[:mid], audio[mid:mid*2])

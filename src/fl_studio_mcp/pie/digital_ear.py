@@ -142,6 +142,40 @@ class DigitalEarEngine:
             "verdict": "Audio requires fixing." if (has_dc or has_clipping) else "Audio is mathematically clean."
         }
 
+    def analyze_stereo_phase(self, audio_left: np.ndarray, audio_right: np.ndarray) -> dict[str, Any]:
+        """Real DSP analysis for stereo phase correlation using Pearson correlation coefficient.
+
+        Args:
+            audio_left: Left channel audio buffer.
+            audio_right: Right channel audio buffer.
+        """
+        if len(audio_left) == 0 or len(audio_right) == 0:
+            return {"error": "Missing audio data."}
+
+        min_len = min(len(audio_left), len(audio_right))
+        left = audio_left[:min_len]
+        right = audio_right[:min_len]
+
+        # Calculate Pearson correlation coefficient
+        # Returns a 2x2 matrix, we want the off-diagonal value
+        try:
+            correlation_matrix = np.corrcoef(left, right)
+            correlation = float(correlation_matrix[0, 1])
+        except Exception:
+            correlation = 1.0 # Fallback for silence or perfect match
+
+        # Interpret the correlation:
+        # +1.0 = Perfect Mono
+        # 0.0 = Wide Stereo
+        # -1.0 = Out of phase (destructive cancellation when collapsed to mono)
+        mono_compatible = correlation >= 0.0
+
+        return {
+            "correlation": correlation,
+            "mono_compatible": mono_compatible,
+            "warning": "Severe phase cancellation issues detected. Bass will disappear in mono." if not mono_compatible else "Phase is safe."
+        }
+
 # Singleton instance
 _digital_ear_engine = DigitalEarEngine()
 

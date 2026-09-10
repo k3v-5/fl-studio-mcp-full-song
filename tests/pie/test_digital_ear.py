@@ -40,3 +40,25 @@ def test_digital_ear_lufs():
     assert res["current_lufs"] > -10.0 # Should be quite loud
     # True peak of a 1.0 sine wave should be roughly 0.0 dB
     assert -1.0 <= res["current_true_peak"] <= 1.0
+
+def test_digital_ear_phase():
+    engine = DigitalEarEngine(port=9997)
+
+    sr = 44100
+    t = np.linspace(0, 1.0, sr, endpoint=False)
+
+    # Identical signals (Perfect mono compatibility)
+    audio_l = np.sin(2 * np.pi * 100 * t).astype(np.float32)
+    audio_r = np.sin(2 * np.pi * 100 * t).astype(np.float32)
+
+    res_good = engine.analyze_stereo_phase(audio_l, audio_r)
+    assert "error" not in res_good
+    assert res_good["correlation"] > 0.9
+    assert res_good["mono_compatible"] is True
+
+    # Inverted signal (Destructive out of phase)
+    audio_r_inv = -audio_l
+    res_bad = engine.analyze_stereo_phase(audio_l, audio_r_inv)
+    assert "error" not in res_bad
+    assert res_bad["correlation"] < -0.9
+    assert res_bad["mono_compatible"] is False

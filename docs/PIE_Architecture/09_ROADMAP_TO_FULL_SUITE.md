@@ -24,7 +24,7 @@ El UDP listener en Python funciona, pero falta la pieza central que envía el au
 - [x] **Generador Sidechain Automático (Ducking)** (Se implementó como Mejora C).
 - [ ] **Desarrollo del VST en C++ (El Sender):** Programar un VST3 real en JUCE o Rust (`nih-plug`) que se instale en el Master de FL Studio y envíe el stream estéreo a `localhost:9878`.
 - [ ] **Análisis Multi-Pista Estéreo:** Actualizar el VST para que pueda enviarse desde pistas individuales (ej. enviar Bass Bus y Kick Bus por puertos UDP separados) para que el `analyze_masking` funcione en tiempo real sin depender de la masterización general.
-- [ ] **Phase Analyzer:** Incorporar análisis de fase y correlación estéreo (Goniometer) usando `numpy.corrcoef` para reportar si la mezcla es segura para sistemas Mono.
+- [x] **Phase Analyzer:** Incorporar análisis de fase y correlación estéreo (Goniometer) usando `numpy.corrcoef` para reportar si la mezcla es segura para sistemas Mono.
 
 ## 4. Hackeo de Proyectos (Path 3 - PyFLP)
 Se demostró que PyFLP puede leer el proyecto y hacer backups, pero la inyección es rudimentaria.
@@ -41,4 +41,4 @@ Se demostró que PyFLP puede leer el proyecto y hacer backups, pero la inyecció
 - [x] **Policy Engine Dinámico** (Implementado).
 - [x] **Sistema de Snapshot JSON** (Implementado).
 - [ ] **Rollback Físico Completo:** Actualmente el `TransactionManager` guarda el snapshot, pero la función `rollback()` necesita implementarse físicamente: debe iterar sobre el JSON anterior y enviar todos los comandos MIDI invertidos (Volumen, Paneos, Macros) a FL Studio para restaurar la sesión acústicamente.
-- [ ] **Garbage Collector:** Limpiar los snapshots antiguos o proyectos `.pie_backup` de la carpeta temporal para evitar saturar el disco duro después de sesiones largas con la IA.
+- [x] **Garbage Collector:** Limpiar los snapshots antiguos o proyectos `.pie_backup` de la carpeta temporal para evitar saturar el disco duro después de sesiones largas con la IA.

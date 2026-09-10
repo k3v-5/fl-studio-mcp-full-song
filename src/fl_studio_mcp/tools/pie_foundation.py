@@ -86,3 +86,13 @@ def register_pie_foundation_tools(mcp: FastMCP) -> None:
             return f"Snapshot {name} not found on disk."
         except Exception as e:
             return f"Failed to restore snapshot: {e}"
+
+    @mcp.tool()
+    def snapshot_garbage_collect(project_dir: str | None = None) -> dict[str, Any]:
+        """Clean up old snapshots and backup files to save disk space.
+
+        Args:
+            project_dir: Optional absolute path to a project directory to clean .pie_backup files.
+        """
+        tx_manager = get_transaction_manager()
+        return tx_manager.garbage_collect(project_dir)

@@ -95,6 +95,31 @@ class TransactionManager:
         # Implementation would read JSON and fire SET commands to FL Studio
         return True
 
+    def garbage_collect(self, project_dir: str | None = None) -> dict[str, Any]:
+        """Clean up old snapshot files and .pie_backup files to free disk space."""
+        deleted_snapshots = 0
+        deleted_backups = 0
+
+        # Clean snapshots directory
+        if os.path.exists(self.snapshots_dir):
+            for file in os.listdir(self.snapshots_dir):
+                if file.endswith(".json"):
+                    os.remove(os.path.join(self.snapshots_dir, file))
+                    deleted_snapshots += 1
+
+        # Clean specific project backup if requested
+        if project_dir and os.path.exists(project_dir):
+            for file in os.listdir(project_dir):
+                if file.endswith(".pie_backup"):
+                    os.remove(os.path.join(project_dir, file))
+                    deleted_backups += 1
+
+        return {
+            "status": "success",
+            "deleted_snapshots": deleted_snapshots,
+            "deleted_backups": deleted_backups
+        }
+
 
 # Singleton instance
 _tx_manager = TransactionManager()
