@@ -32,6 +32,7 @@ from fl_studio_mcp.tools.pie_governance import register_pie_governance_tools
 from fl_studio_mcp.tools.pie_music import register_pie_music_tools
 from fl_studio_mcp.tools.pie_arrangement import register_pie_arrangement_tools
 from fl_studio_mcp.tools.pie_sound_design import register_pie_sound_design_tools
+from fl_studio_mcp.tools.pie_digital_ear import register_pie_digital_ear_tools
 from fl_studio_mcp.utils.connection import get_connection, reset_connection
 
 # Create the MCP server
@@ -150,6 +151,7 @@ register_pie_governance_tools(mcp)
 register_pie_music_tools(mcp)
 register_pie_arrangement_tools(mcp)
 register_pie_sound_design_tools(mcp)
+register_pie_digital_ear_tools(mcp)
 
 
 def main():
