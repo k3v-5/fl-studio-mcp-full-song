@@ -94,14 +94,26 @@ class PlaylistArranger:
     def auto_import_midi_to_playlist(
         self,
         midi_file_path: str,
-        settle_delay: float = 0.4,
-        start_new_project: bool = False,
+        settle_delay: float = 0.5,
+        start_new_project: bool = True,
+        load_timeout: float = 2.0,
+        focus_channel_rack: bool = True,
     ) -> Dict[str, Any]:
         """Automate FL Studio's native 'File > Import > MIDI file...' command.
 
-        This opens the MIDI file directly inside FL Studio, causing FL's internal
-        engine to map every track to a channel and place all patterns directly
-        across the Playlist tracks, completely eliminating manual dragging.
+        This imports the multi-track MIDI file directly into FL Studio, causing FL's
+        internal engine to spawn discrete Channel Rack generator channels for each
+        instrument track with automatic mixer insert routing (1..N).
+
+        Crucial technical steps:
+        1. Force focus onto FL Studio's Delphi VCL window.
+        2. Trigger 'File > Import > MIDI file...' (Alt+F -> I -> M).
+        3. Focus the Windows Open File dialog edit control using universal Alt+N accelerator.
+        4. Clear and inject the absolute MIDI path into the text box and press Enter.
+        5. In FL Studio's modal 'Import MIDI data' dialog, press Enter to accept
+           ('All tracks' + 'Create one channel per track' + 'Set mixer tracks').
+        6. Settle for `load_timeout` seconds while FL Studio instantiates plugins (FLEX/Sampler).
+        7. Optionally focus the Channel Rack (F6) so the user immediately sees the tracks.
         """
         abs_path = os.path.abspath(midi_file_path)
         if not os.path.exists(abs_path):
@@ -110,11 +122,20 @@ class PlaylistArranger:
                 "error": f"MIDI file not found at: {abs_path}",
             }
 
+        track_names: List[str] = []
+        try:
+            import mido
+            mid = mido.MidiFile(abs_path)
+            track_names = [t.name for t in mid.tracks if t.name and t.name.lower() != "tempo"]
+        except Exception as e:
+            logger.debug("Could not parse MIDI track names: %s", e)
+
         if sys.platform != "win32":
             return {
                 "ok": False,
                 "error": "Automated GUI MIDI import is currently optimized for Windows FL Studio.",
                 "manual_path": abs_path,
+                "track_names": track_names,
             }
 
         hwnd = find_fl_hwnd()
@@ -123,6 +144,7 @@ class PlaylistArranger:
                 "ok": False,
                 "error": "FL Studio main window not found (TFruityLoopsMainForm). Ensure FL Studio is running.",
                 "manual_path": abs_path,
+                "track_names": track_names,
             }
 
         try:
@@ -133,7 +155,10 @@ class PlaylistArranger:
                 "ok": False,
                 "error": f"Required GUI automation library missing: {e}",
                 "manual_path": abs_path,
+                "track_names": track_names,
             }
+
+        pyautogui.FAILSAFE = False
 
         # 1. Force focus onto FL Studio
         focused = force_focus(hwnd)
@@ -141,33 +166,56 @@ class PlaylistArranger:
 
         # 2. Trigger File > Import > MIDI file...
         # In FL Studio: Alt (activates menu) -> 'f' (File) -> 'i' (Import) -> 'm' (MIDI file)
-        pyautogui.FAILSAFE = False
         pyautogui.hotkey("alt", "f")
-        time.sleep(0.15)
+        time.sleep(0.2)
         pyautogui.press("i")
-        time.sleep(0.15)
+        time.sleep(0.2)
         pyautogui.press("m")
-        time.sleep(settle_delay)
+        time.sleep(max(settle_delay, 0.6))
 
-        # 3. Paste absolute file path into Windows Open File dialog
+        # 3. Focus filename edit box in Windows Open dialog using Alt+N
+        # 'Alt+N' is the universal accelerator in both English ('File name:') and Spanish ('Nombre de archivo:')
+        pyautogui.hotkey("alt", "n")
+        time.sleep(0.15)
+        pyautogui.hotkey("ctrl", "a")
+        time.sleep(0.05)
+        pyautogui.press("backspace")
+        time.sleep(0.05)
+
+        # 4. Inject target path and press Enter to open
         pyperclip.copy(abs_path)
         time.sleep(0.1)
         pyautogui.hotkey("ctrl", "v")
+        time.sleep(0.25)
+        pyautogui.press("enter")
+        time.sleep(max(settle_delay, 0.8))
+
+        # 5. FL Studio displays the "Import MIDI data" dialog
+        # Ensure focus is back on FL Studio modal dialog and accept
+        force_focus(hwnd)
         time.sleep(0.15)
         pyautogui.press("enter")
-        time.sleep(settle_delay)
 
-        # 4. FL Studio displays the "Import MIDI data" dialog
-        # Press Enter to accept default track mapping into Playlist
-        pyautogui.press("enter")
-        time.sleep(0.2)
+        # 6. Settle while FL Studio allocates channels and instantiates generator plugins
+        time.sleep(load_timeout)
+
+        # 7. Bring Channel Rack forward so all created tracks are immediately visible
+        if focus_channel_rack:
+            pyautogui.press("f6")
+            time.sleep(0.2)
 
         return {
             "ok": True,
             "status": "imported",
             "file": abs_path,
             "focused": focused,
-            "message": "MIDI file automatically imported and arranged across FL Studio Playlist tracks.",
+            "tracks_count": len(track_names),
+            "track_names": track_names,
+            "message": (
+                f"MIDI file imported successfully into FL Studio with {len(track_names)} discrete channels."
+                if track_names
+                else "MIDI file imported successfully into FL Studio Channel Rack."
+            ),
         }
 
     def auto_arrange_song(
@@ -175,12 +223,16 @@ class PlaylistArranger:
         midi_path: str,
         sections: Optional[List[Dict[str, Any]]] = None,
         bpm: float = 140.0,
-        settle_delay: float = 0.4,
+        settle_delay: float = 0.5,
+        start_new_project: bool = True,
+        load_timeout: float = 2.0,
+        focus_channel_rack: bool = True,
     ) -> Dict[str, Any]:
         """Full hands-free song arrangement execution:
-        1. Adds timeline section markers in FL Studio.
-        2. Automates MIDI import to populate Playlist tracks.
-        3. Sets transport position to bar 0 and syncs tempo.
+        1. Syncs tempo via SysEx bridge.
+        2. Adds timeline section markers in FL Studio.
+        3. Automates native multi-track MIDI import to populate Channel Rack & Playlist.
+        4. Focuses Channel Rack and sets song position to start.
         """
         bridge = self._get_bridge()
         marker_result = {}
@@ -196,8 +248,14 @@ class PlaylistArranger:
         if sections and self._is_connected():
             marker_result = self.add_timeline_markers(sections)
 
-        # 3. Automated MIDI file import
-        import_result = self.auto_import_midi_to_playlist(midi_path, settle_delay=settle_delay)
+        # 3. Automated native multi-track MIDI file import
+        import_result = self.auto_import_midi_to_playlist(
+            midi_path,
+            settle_delay=settle_delay,
+            start_new_project=start_new_project,
+            load_timeout=load_timeout,
+            focus_channel_rack=focus_channel_rack,
+        )
 
         # 4. Rewind to start
         if self._is_connected():
@@ -211,7 +269,9 @@ class PlaylistArranger:
             "midi_import": import_result,
             "markers": marker_result,
             "bpm": bpm,
-            "summary": "Song arranged automatically on Playlist timeline without manual dragging.",
+            "tracks_count": import_result.get("tracks_count", 0),
+            "track_names": import_result.get("track_names", []),
+            "summary": "Song arranged automatically with discrete channels in Channel Rack and mapped to Playlist.",
         }
 
 

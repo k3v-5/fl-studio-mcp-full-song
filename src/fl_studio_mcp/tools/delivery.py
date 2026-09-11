@@ -66,18 +66,30 @@ def register(mcp: FastMCP) -> None:
         tracks: Annotated[List[Dict[str, Any]], Field(description="List of tracks: [{'name': str, 'channel': int, 'notes': list}]")],
         song_name: Annotated[str, Field(description="Song or arrangement name.")] = "Arrangement",
         bpm: Annotated[float, Field(ge=10.0, le=999.0, description="Tempo in BPM.")] = 140.0,
+        auto_import: Annotated[bool, Field(description="If True, automatically triggers native FL Studio MIDI import (File > Import > MIDI file) to instantiate discrete channels without manual dragging.")] = False,
     ) -> dict:
         """Compile a multi-track Standard MIDI File (SMF Type 1) with tempo and markers.
 
-        Saves to exports/ and copies directly to FL Studio Presets/Scores for 1-click
-        loading and immediate dragging into the Playlist.
+        Saves to exports/ and copies directly to FL Studio Presets/Scores.
+        WARNING: In FL Studio, dragging a multi-track .mid directly from the browser onto
+        the Playlist or Channel Rack collapses all tracks into the single active channel!
+        Set auto_import=True or use File > Import > MIDI file... to instantiate discrete channels.
         """
         engine = get_delivery_engine()
-        return engine.deliver_midi_file(
+        result = engine.deliver_midi_file(
             tracks=tracks,
             song_name=song_name,
             bpm=bpm,
         )
+        if auto_import and result.get("ok") and result.get("path"):
+            from ..pie.auto_arranger import get_playlist_arranger
+            arranger = get_playlist_arranger()
+            import_res = arranger.auto_arrange_song(
+                midi_path=result["path"],
+                bpm=bpm,
+            )
+            result["auto_import"] = import_res
+        return result
 
     @mcp.tool(annotations={"title": "Universal Note Delivery (Selectable Mode)", **_WR})
     def fl_deliver_notes(

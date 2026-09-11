@@ -96,13 +96,17 @@ def register_pie_arrangement_tools(mcp: FastMCP) -> None:
         midi_path: str,
         sections: list[dict[str, Any]] | None = None,
         bpm: float = 140.0,
-        settle_delay: float = 0.4,
+        settle_delay: float = 0.5,
+        start_new_project: bool = True,
+        load_timeout: float = 2.0,
+        focus_channel_rack: bool = True,
     ) -> dict[str, Any]:
         """Automatically arrange a multi-track song onto FL Studio's Playlist timeline.
 
         Eliminates manual drag-and-drop by automating FL Studio's native MIDI import
-        (Alt+F -> I -> M + path injection) and creating timeline section markers
-        (Intro, Build, Drop, Outro) at exact bar locations.
+        (File > Import > MIDI file via Alt+F -> I -> M + universal Alt+N path injection)
+        and creating timeline section markers (Intro, Build, Drop, Outro) at exact bar locations.
+        Spawns discrete generator channels per track in Channel Rack with automated mixer routing.
         """
         from fl_studio_mcp.pie.auto_arranger import get_playlist_arranger
         arranger = get_playlist_arranger()
@@ -111,5 +115,8 @@ def register_pie_arrangement_tools(mcp: FastMCP) -> None:
             sections=sections,
             bpm=bpm,
             settle_delay=settle_delay,
+            start_new_project=start_new_project,
+            load_timeout=load_timeout,
+            focus_channel_rack=focus_channel_rack,
         )
 

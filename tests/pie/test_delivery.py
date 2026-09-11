@@ -120,3 +120,54 @@ def test_delivery_universal_all(mock_midi, mock_pyscript, mock_record):
     mock_midi.assert_called_once()
     mock_pyscript.assert_called_once()
     mock_record.assert_called_once()
+
+
+@patch("fl_studio_mcp.pie.delivery.get_delivery_engine")
+@patch("fl_studio_mcp.pie.auto_arranger.get_playlist_arranger")
+def test_fl_export_arrangement_midi_auto_import(mock_get_arranger, mock_get_engine):
+    from fastmcp import FastMCP
+    from fl_studio_mcp.tools.delivery import register
+
+    mock_engine = MagicMock()
+    mock_engine.deliver_midi_file.return_value = {
+        "ok": True,
+        "status": "success",
+        "path": "f:/Dev/test.mid",
+        "tracks_count": 2,
+    }
+    mock_get_engine.return_value = mock_engine
+
+    mock_arranger = MagicMock()
+    mock_arranger.auto_arrange_song.return_value = {
+        "ok": True,
+        "tracks_count": 2,
+        "track_names": ["Drums", "Synth"],
+    }
+    mock_get_arranger.return_value = mock_arranger
+
+    mcp = FastMCP("test_delivery")
+    register(mcp)
+
+    # Call tool function directly from registered tools
+    export_tool = None
+    for tool in mcp._tool_manager._tools.values():
+        if tool.name == "fl_export_arrangement_midi":
+            export_tool = tool.fn
+            break
+
+    assert export_tool is not None
+    res = export_tool(
+        tracks=[{"name": "Drums", "channel": 0, "notes": []}],
+        song_name="AutoImportTest",
+        bpm=120.0,
+        auto_import=True,
+    )
+
+    assert res["ok"] is True
+    assert "auto_import" in res
+    assert res["auto_import"]["ok"] is True
+    mock_arranger.auto_arrange_song.assert_called_once_with(
+        midi_path="f:/Dev/test.mid",
+        bpm=120.0,
+    )
+

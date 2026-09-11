@@ -121,6 +121,62 @@ Controlling FL Studio programmatically from an external AI agent operates across
 
 ---
 
+### 7. The "Browser Drag-to-Playlist Single Channel Collapsing Trap"
+
+* **The Limitation:**
+  In FL Studio, when dragging a multi-track Standard MIDI File (`.mid` Type 1 with multiple discrete tracks) from the FL Browser or Windows Explorer onto the Playlist or Channel Rack:
+  - FL Studio's internal event dispatcher treats drag-and-drop as **"drop score onto target channel"**.
+  - FL Studio **merges/collapses all MIDI notes from every track into the single active/highlighted channel** (e.g., `808 Kick` or Channel 0).
+  - All other channels in the Channel Rack remain completely empty, while the single target channel suffers a devastating polyphonic collision of kicks, snares, basslines, chord progressions, vocals, and sound effects all playing simultaneously through one instrument.
+* **Impact on Autonomous Production:**
+  Programmatic attempts to emulate drag-and-drop from the Browser into the Playlist or Channel Rack fail catastrophically by smashing the arrangement into a single channel.
+* **Our Implemented Workaround:**
+  - **Native Multi-Track Importer Pipeline (`auto_import_midi_to_playlist`):**
+    Instead of drag-and-drop, the engine programmatically automates FL Studio's native `File > Import > MIDI file...` flow (`Alt+F` $\to$ `I` $\to$ `M`).
+    This native C++ import routine invokes FL Studio's multi-track MIDI project parser, which:
+    1. Instantiates discrete generator channels in the Channel Rack for each track.
+    2. Automatically assigns each channel to its own Mixer Insert track (`1..N`).
+    3. Renders the discrete patterns onto individual Playlist tracks.
+* **Roadmap / Future Solution:**
+  - Provide an option in the delivery engine to auto-detect and decompose Type 1 SMFs into isolated individual Type 0 `.mid` files if single-track drag injection is ever required.
+
+---
+
+### 8. Multi-Track MIDI Import Orchestration & OS Dialog Mechanics
+
+* **The Limitation:**
+  Automating FL Studio's native `File > Import > MIDI file...` flow via GUI scripting involves navigating Windows OS common dialogs (`#32770`) and Delphi VCL modal forms. Several critical operational hurdles exist:
+  1. **Unfocused Open Dialog Edit Control:** When the Windows Open File dialog appears, keyboard focus is initially situated on the directory tree or file list view rather than the "File name" edit box. Sending keystrokes or blind `Ctrl+V` immediately pastes into the list view or fails completely.
+  2. **Delphi VCL Modal Form Latency:** After submitting the file path, FL Studio displays its secondary Delphi modal dialog ("Import MIDI data") containing checkboxes for "Start new project", "All tracks", "Create one channel per track", etc. This dialog takes 200–500ms to initialize and must be confirmed with an `Enter` keystroke.
+  3. **Heavy Generator Plugin Load Timeouts:** Spawning 7+ generator channels (such as FLEX or multi-sample players) causes FL Studio's engine to instantiate multiple audio plugins simultaneously. If the external automation sends further keystrokes or SysEx commands before the plugins finish loading, FL Studio's GUI thread drops the inputs.
+* **Impact on Autonomous Production:**
+  Without proper window handle targeting, accelerator keystrokes, and settling delay orchestration, automated MIDI import fails silently or gets stuck at modal prompts.
+* **Our Implemented Workaround:**
+  - **Universal Accelerator Key (`Alt+N`):** In all Windows common file dialogs (both English `"File &name:"` and Spanish `"&Nombre de archivo:"`), the letter `N` is hardwired as the access key for the file name text box. Invoking `pyautogui.hotkey("alt", "n")` guarantees that focus is immediately moved to the edit control regardless of OS locale.
+  - **Clean Path Injection:** Clears any existing text (`Ctrl+A` $\to$ `Backspace`), copies the absolute normalized path to the Windows clipboard (`pyperclip.copy`), and pastes it (`Ctrl+V`) followed by `Enter`.
+  - **Modal Focus Recall & Confirmation:** Re-checks and re-focuses FL Studio's window handle before issuing the confirming `Enter` for the "Import MIDI data" modal dialog.
+  - **Configurable `load_timeout` & Channel Rack Focus (`F6`):** Applies a configurable delay (`load_timeout=2.0s`) to allow all generator plugins to initialize in memory, followed by an immediate `F6` hotkey to bring the Channel Rack forward so all newly populated tracks are visible to the user.
+* **Roadmap / Future Solution:**
+  - Detect the Delphi modal window handle (`#32770` or `TMessageForm`) directly via `win32gui.FindWindowEx` to dynamically await dialog readiness rather than relying strictly on time-based delays.
+
+---
+
+### 9. Channel Rack Viewport Truncation & Visual Verification
+
+* **The Limitation:**
+  In FL Studio's default UI layout, the Channel Rack window is often vertically constrained to display only 4 to 6 channels simultaneously. When a multi-track production creates 7, 8, or more channels (e.g. Flamenco Palmas, Kick, Snare, 808 Bass, Nylon Guitar, Vocal Chops, FX):
+  - Channels 6, 7, etc., are instantiated correctly, routed to mixer inserts, and playing audio, but remain scrolled out of view below the bottom bezel of the Channel Rack.
+  - An external screenshot or surface visual inspection can give the false impression that channels were not created.
+* **Impact on Autonomous Production:**
+  Visual feedback via screenshot alone can mislead an AI agent or user into believing that channels failed to import, even when the underlying audio engine is 100% active and routed.
+* **Our Implemented Workaround:**
+  - **Automated Channel Rack Focus (`F6`):** The import pipeline explicitly fires `F6` to bring the Channel Rack to the forefront.
+  - **Multi-Level State Verification:** The engine inspects track metadata directly via `mido` parsing prior to import, reports `tracks_count` and `track_names` in tool returns, and verifies audio playback via Mixer Insert meter activity (`CMD_MIXER_GET_VU`) rather than relying solely on viewport screenshots.
+* **Roadmap / Future Solution:**
+  - Add a Win32 window resizing helper (`win32gui.SetWindowPos` or `pyautogui` drag on Channel Rack border) to dynamically stretch the Channel Rack vertically when more than 6 channels are loaded.
+
+---
+
 ## Comparative Matrix: FL Studio API Capabilities vs. Workarounds
 
 | Feature / Action | FL Studio MIDI API | FL Piano Roll API | MCP Workaround Implemented | Production Readiness |
@@ -131,6 +187,7 @@ Controlling FL Studio programmatically from an external AI agent operates across
 | **Channel Parameters & Volume** | Native Direct | N/A | Bidirectional SysEx | **100% Native** |
 | **Note Writing to Active Pattern** | Blocked | Native (`addNote`) | Daemon generated `.pyscript` + `Ctrl+Alt+Y` | **100% Automated** |
 | **Multi-Track Arrangement on Playlist** | **Not Supported** | **Not Supported** | Hands-free SMF MIDI import macro (`Alt+F` $\to$ `I` $\to$ `M`) | **100% Automated** |
+| **Discrete Multi-Track Channel Creation** | **Not Supported** | N/A | Automated native MIDI import with `Alt+N` & Delphi modal handling | **100% Automated** |
 | **Timeline Section Markers** | Native Direct | N/A | `arrangement.addAutoTimeMarker` SysEx | **100% Native** |
 | **FL Studio Native Slide Notes** | N/A | Native (`n.slide`) | `slide: True` flag in `.pyscript` generator | **100% Native (IL synths)** |
 | **Third-Party VST Pitch Glides** | N/A | **Not Supported** | 14-bit MIDI `pitchwheel` curves (-8192..8191) | **100% Cross-platform** |
@@ -141,8 +198,12 @@ Controlling FL Studio programmatically from an external AI agent operates across
 
 ## Actionable Engineering Recommendations
 
-1. **Pre-Cooked Smart Templates:** Maintain a library of templates (`flp_templates/`) pre-loaded with:
+1. **Native Multi-Track MIDI Import as Default:** Always route multi-track arrangements through `File > Import > MIDI file...` (`auto_import_midi_to_playlist` or `auto_import=True` in `fl_export_arrangement_midi`) rather than instructing or attempting drag-and-drop, avoiding the single-channel collapsing trap.
+2. **Universal OS Accelerators:** Always use standard Win32 dialog accelerators (`Alt+N` for file dialogs) rather than assuming input focus is pre-set on text boxes.
+3. **Multi-Layer State Verification:** Verify production completeness using SysEx bridge queries (Mixer track levels, peak meters, channel list) rather than relying exclusively on surface GUI screenshots that may be truncated.
+4. **Pre-Cooked Smart Templates:** Maintain a library of templates (`flp_templates/`) pre-loaded with:
    - Tracks 1-8 in Channel Rack mapped to Playlist Rows 1-8.
    - Serum, Vital, 3xOsc, FPC, and Fruity Sampler pre-assigned.
    - Pre-routed mixer sidechains (Kick Peak Controller $\to$ Bass Volume Envelope).
-2. **C++ Sidecar / Helper DLL (Phase 2):** For production environments requiring sub-millisecond control over Playlist clips and audio buffers without GUI hotkeys, a custom VST3/DLL bridge loaded in FL Studio will unlock 100% internal C++ engine access.
+5. **C++ Sidecar / Helper DLL (Phase 2):** For production environments requiring sub-millisecond control over Playlist clips and audio buffers without GUI hotkeys, a custom VST3/DLL bridge loaded in FL Studio will unlock 100% internal C++ engine access.
+
