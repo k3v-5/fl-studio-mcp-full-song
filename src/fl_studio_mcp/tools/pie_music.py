@@ -75,3 +75,55 @@ def register_pie_music_tools(mcp: FastMCP) -> None:
         from fl_studio_mcp.pie.music_llm import get_external_music_connector
         connector = get_external_music_connector()
         return connector.fetch_advanced_midi(model_type, prompt, length_beats)
+
+    @mcp.tool()
+    def fl_generate_808_slides(
+        root_pitch: int = 36,
+        slide_pitch: int = 48,
+        start_bar: float = 0.0,
+        root_length_bars: float = 1.0,
+        slide_length_bars: float = 0.25,
+        velocity: float = 0.85,
+    ) -> dict[str, Any]:
+        """Generate authentic 808 glide/slide note pairs for FL Studio.
+
+        Produces an overlapping sustained root note and target slide note with slide=True,
+        which triggers FL Studio's native polyphonic slide engine.
+        """
+        from fl_studio_mcp.pie.modulation_engine import get_modulation_engine
+        mod = get_modulation_engine()
+        notes = mod.generate_808_slides(
+            root_pitch=root_pitch,
+            slide_pitch=slide_pitch,
+            start_bar=start_bar,
+            root_length_bars=root_length_bars,
+            slide_length_bars=slide_length_bars,
+            velocity=velocity,
+        )
+        return {"ok": True, "notes": notes, "count": len(notes)}
+
+    @mcp.tool()
+    def fl_generate_modulation_lfo(
+        shape: str = "wobble",
+        bars: float = 4.0,
+        rate_cycles_per_bar: float = 2.0,
+        target_param: str = "filter_cutoff",
+        min_val: int = 20,
+        max_val: int = 120,
+    ) -> dict[str, Any]:
+        """Generate LFO modulation curves for synths (Wobble bass, Dubstep LFO, Sine, Saw).
+
+        Outputs timed CC events (CC 1 Mod Wheel or CC 74 Filter Cutoff) to modulate
+        synth parameters across bars.
+        """
+        from fl_studio_mcp.pie.modulation_engine import get_modulation_engine
+        mod = get_modulation_engine()
+        curve = mod.generate_lfo_curve(
+            shape=shape,
+            bars=bars,
+            rate_hz_or_subdiv=rate_cycles_per_bar,
+            min_val=min_val,
+            max_val=max_val,
+        )
+        return {"ok": True, "shape": shape, "target_param": target_param, "points_count": len(curve), "curve": curve}
+

@@ -59,3 +59,26 @@ def register_pie_sound_design_tools(mcp: FastMCP) -> None:
         """
         sde = get_sound_design_engine()
         return sde.lint_macros(current_macros, custom_rules)
+
+    @mcp.tool()
+    def fl_scan_available_plugins(force_rescan: bool = False) -> dict[str, Any]:
+        """Scan local FL Studio installation and VST folders for instruments and plugins.
+
+        Discovers installed synths (Serum, Vital, 3xOsc, Analog Lab), drum kits (FPC, Bloom),
+        and Channel presets (.fst files) across user preset directories.
+        """
+        from fl_studio_mcp.pie.preset_loader import get_preset_loader
+        loader = get_preset_loader()
+        return loader.scan_installed_generators(force_rescan=force_rescan)
+
+    @mcp.tool()
+    def fl_scaffold_genre_instruments(genre: str = "dubstep") -> dict[str, Any]:
+        """Automatically design and scaffold an instrument rack tailored for a specific genre.
+
+        Matches roles (Kick, Snare, HiHats, SubBass, GrowlBass, LeadSynth, FX) with the best
+        available synths on the system (e.g. Serum, Vital, FPC, 3xOsc) and configures default routing.
+        """
+        from fl_studio_mcp.pie.preset_loader import get_preset_loader
+        loader = get_preset_loader()
+        return loader.scaffold_genre_rack(genre)
+

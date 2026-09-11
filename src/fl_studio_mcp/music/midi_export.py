@@ -43,11 +43,43 @@ def build_midi(tracks, bpm, ppq=480, beats_per_bar=4):
         for n in t.get("notes", []):
             pitch = max(0, min(127, int(n["pitch"])))
             vel = _vel(n.get("velocity", 0.787))
-            st = max(0, int(round(float(n["start_bars"]) * ticks_per_bar)))
-            dur = max(1, int(round(float(n["length_bars"]) * ticks_per_bar)))
-            events.append((st, 1, mido.Message("note_on", note=pitch, velocity=vel, channel=ch)))
+            st_bar = float(n.get("start_bars", n.get("time_bars", 0.0)))
+            dur_bar = float(n.get("length_bars", 0.25))
+            st = max(0, int(round(st_bar * ticks_per_bar)))
+            dur = max(1, int(round(dur_bar * ticks_per_bar)))
+            events.append((st, 2, mido.Message("note_on", note=pitch, velocity=vel, channel=ch)))
             events.append((st + dur, 0, mido.Message("note_off", note=pitch, velocity=0, channel=ch)))
-        events.sort(key=lambda e: (e[0], e[1]))       # off before on at a tie
+
+        # Pitch bends (-8192 to 8191)
+        for pb in t.get("pitch_bends", []):
+            t_bar = float(pb.get("time_bars", 0.0))
+            tick = max(0, int(round(t_bar * ticks_per_bar)))
+            bend = max(-8192, min(8191, int(pb.get("pitch", 0))))
+            events.append((tick, 1, mido.Message("pitchwheel", pitch=bend, channel=ch)))
+
+        # Control Changes (CC 1 Mod Wheel, CC 74 Filter Cutoff, etc.)
+        for cc in t.get("control_changes", []):
+            t_bar = float(cc.get("time_bars", 0.0))
+            tick = max(0, int(round(t_bar * ticks_per_bar)))
+            ctrl = max(0, min(127, int(cc.get("control", 1))))
+            val = max(0, min(127, int(cc.get("value", 0))))
+            events.append((tick, 1, mido.Message("control_change", control=ctrl, value=val, channel=ch)))
+
+        # Convenience CC1 Mod Wheel list
+        for mw in t.get("mod_wheels", []):
+            t_bar = float(mw.get("time_bars", 0.0))
+            tick = max(0, int(round(t_bar * ticks_per_bar)))
+            val = max(0, min(127, int(mw.get("value", 0))))
+            events.append((tick, 1, mido.Message("control_change", control=1, value=val, channel=ch)))
+
+        # Convenience CC74 Filter Cutoff list
+        for fc in t.get("filter_sweeps", []):
+            t_bar = float(fc.get("time_bars", 0.0))
+            tick = max(0, int(round(t_bar * ticks_per_bar)))
+            val = max(0, min(127, int(fc.get("value", 0))))
+            events.append((tick, 1, mido.Message("control_change", control=74, value=val, channel=ch)))
+
+        events.sort(key=lambda e: (e[0], e[1]))       # off (0) before cc/pb (1) before on (2)
         prev = 0
         for abs_t, _order, msg in events:
             msg.time = abs_t - prev

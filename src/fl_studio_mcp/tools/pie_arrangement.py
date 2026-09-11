@@ -90,3 +90,26 @@ def register_pie_arrangement_tools(mcp: FastMCP) -> None:
         """
         ae = get_arrangement_engine()
         return ae.generate_transition_riser(target_section_name, length_beats, start_midi, end_midi, curve_type)
+
+    @mcp.tool()
+    def fl_auto_arrange_playlist(
+        midi_path: str,
+        sections: list[dict[str, Any]] | None = None,
+        bpm: float = 140.0,
+        settle_delay: float = 0.4,
+    ) -> dict[str, Any]:
+        """Automatically arrange a multi-track song onto FL Studio's Playlist timeline.
+
+        Eliminates manual drag-and-drop by automating FL Studio's native MIDI import
+        (Alt+F -> I -> M + path injection) and creating timeline section markers
+        (Intro, Build, Drop, Outro) at exact bar locations.
+        """
+        from fl_studio_mcp.pie.auto_arranger import get_playlist_arranger
+        arranger = get_playlist_arranger()
+        return arranger.auto_arrange_song(
+            midi_path=midi_path,
+            sections=sections,
+            bpm=bpm,
+            settle_delay=settle_delay,
+        )
+

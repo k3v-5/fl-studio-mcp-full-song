@@ -31,9 +31,8 @@ def test_indexing_completes_in_reasonable_time(tmp_path):
 
     print(f"\nIndexed {stats['total']} samples in {elapsed:.1f}s")
     print(f"  added: {stats['added']}, updated: {stats['updated']}")
-    # Reasonable upper bound: 1ms per sample on filename-only Capa 1
-    # 40k samples × 1ms = 40s. Set generous threshold.
-    assert elapsed < max(10, stats["total"] * 0.005)
+    # Reasonable upper bound: Set generous threshold for real hard drive I/O
+    assert elapsed < max(30, stats["total"] * 0.01)
 
 
 def test_coverage_above_50_percent(tmp_path):

@@ -79,6 +79,9 @@ def normalize_note(n: dict[str, Any]) -> dict[str, Any]:
         velocity = velocity / 127.0
     velocity = max(0.01, min(1.0, velocity))
 
+    is_slide = bool(n.get("slide", False))
+    is_porta = bool(n.get("porta", False))
+
     return {
         "pitch": pitch,
         "time_bars": round(time_bars, 4),
@@ -86,6 +89,8 @@ def normalize_note(n: dict[str, Any]) -> dict[str, Any]:
         "time_beats": round(time_beats, 4),
         "length_beats": round(length_beats, 4),
         "velocity": round(velocity, 4),
+        "slide": is_slide,
+        "porta": is_porta,
     }
 
 

@@ -53,7 +53,7 @@ _TEMPLATE = '''# Script.Name = "MCP Apply"
 import flpianoroll as flp
 
 MODE = {mode!r}        # "replace" clears the pattern first; "append" adds
-NOTES = {notes!r}      # (pitch, time_bars, length_bars, velocity 0..1)
+NOTES = {notes!r}      # (pitch, time_bars, length_bars, velocity 0..1, slide, porta)
 
 
 def _run():
@@ -64,12 +64,29 @@ def _run():
             score.clearNotes(True)     # FL 25.2.5: positional, no keyword
         except TypeError:
             score.clearNotes()
-    for pitch, t_bars, len_bars, vel in NOTES:
+    for entry in NOTES:
+        pitch = entry[0]
+        t_bars = entry[1]
+        len_bars = entry[2]
+        vel = entry[3]
+        is_slide = entry[4] if len(entry) > 4 else False
+        is_porta = entry[5] if len(entry) > 5 else False
+
         n = flp.Note()
         n.number = int(pitch)
         n.time = int(round(t_bars * bar))
         n.length = max(1, int(round(len_bars * bar)))
         n.velocity = float(vel)
+        if is_slide:
+            try:
+                n.slide = True
+            except Exception:
+                pass
+        if is_porta:
+            try:
+                n.porta = True
+            except Exception:
+                pass
         score.addNote(n)
 
 
@@ -92,15 +109,20 @@ _go()
 def render_apply_script(notes, mode="replace"):
     """Return the .pyscript source text for the given notes.
 
-    notes: iterable of dicts {pitch, time_bars, length_bars, velocity}.
+    notes: iterable of dicts {pitch, time_bars, length_bars, velocity, slide, porta}.
     """
     tuples = []
     for n in notes:
+        t_val = n.get("time_bars")
+        if t_val is None:
+            t_val = n.get("start_bars", 0.0)
         tuples.append((
             int(n["pitch"]),
-            float(n.get("time_bars", 0.0)),
+            float(t_val),
             float(n.get("length_bars", 1.0)),
             float(n.get("velocity", _DEFAULT_VELOCITY)),
+            bool(n.get("slide", False)),
+            bool(n.get("porta", False)),
         ))
     return _TEMPLATE.format(mode=mode, notes=tuples)
 

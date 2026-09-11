@@ -30,7 +30,18 @@ def mcp_app():
 def call(app: FastMCP, name: str, **kwargs):
     import json
     res = asyncio.run(app.call_tool(name, kwargs))
-    if res.structured_content and "result" in res.structured_content:
+    while isinstance(res, (list, tuple)) and len(res) > 0 and isinstance(res[0], (list, tuple)):
+        res = res[0]
+    if isinstance(res, (list, tuple)) and len(res) > 0:
+        item = res[0]
+        if hasattr(item, "text"):
+            text = item.text
+            try:
+                return json.loads(text)
+            except Exception:
+                return text
+        return res
+    if hasattr(res, "structured_content") and res.structured_content and "result" in res.structured_content:
         val = res.structured_content["result"]
         if isinstance(val, (dict, list)):
             return val
@@ -39,13 +50,13 @@ def call(app: FastMCP, name: str, **kwargs):
                 return json.loads(val)
             except Exception:
                 return val
-    if res.content:
+    if hasattr(res, "content") and res.content:
         text = res.content[0].text
         try:
             return json.loads(text)
         except Exception:
             return text
-    return None
+    return res
 
 
 class TestKnowledgeTheoryTools:
