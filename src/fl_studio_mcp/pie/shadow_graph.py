@@ -9,7 +9,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fl_studio_mcp.utils.connection import get_connection
+from fl_studio_mcp import protocol
+from fl_studio_mcp.connection import fetch_all_pages, get_bridge
 
 class ShadowGraph:
     """A cached representation of the FL Studio project state."""
@@ -21,30 +22,40 @@ class ShadowGraph:
         self.is_synced: bool = False
 
     def refresh(self) -> None:
-        """Poll FL Studio via MIDI to rebuild the shadow state."""
-        conn = get_connection()
-        if not conn.is_connected:
+        """Poll FL Studio via SysEx bridge to rebuild the shadow state."""
+        bridge = get_bridge()
+        if not bridge.is_alive():
             raise RuntimeError("Cannot refresh Shadow Graph: FL Studio is not connected.")
 
-        # Refresh transport
-        transport_res = conn.send_command("transport.getStatus")
-        if transport_res.get("success", False):
-            self.transport = {
-                "is_playing": transport_res.get("is_playing", False),
-                "is_recording": transport_res.get("is_recording", False),
-                "position": transport_res.get("position", ""),
-                "loop_mode": transport_res.get("loop_mode", "pattern"),
-            }
+        # Refresh project & transport
+        try:
+            proj = bridge.call(protocol.CMD_GET_PROJECT_STATE)
+            if isinstance(proj, dict):
+                self.transport = {
+                    "tempo": proj.get("tempo"),
+                    "is_playing": proj.get("playing", False),
+                    "is_recording": proj.get("recording", False),
+                    "song_position": proj.get("song_pos"),
+                    "loop_mode": proj.get("mode", "pattern"),
+                }
+        except Exception:
+            pass
 
         # Refresh mixer
-        mixer_res = conn.send_command("mixer.getAllTracks")
-        if mixer_res.get("success", False) and "tracks" in mixer_res:
-            self.mixer_tracks = {t["index"]: t for t in mixer_res["tracks"]}
+        try:
+            mixer_res = fetch_all_pages(bridge, protocol.CMD_MIXER_LIST_TRACKS, "tracks")
+            if isinstance(mixer_res, dict) and "tracks" in mixer_res:
+                self.mixer_tracks = {t["index"]: t for t in mixer_res["tracks"] if "index" in t}
+        except Exception:
+            pass
 
         # Refresh channels
-        channels_res = conn.send_command("channels.getAll")
-        if channels_res.get("success", False) and "channels" in channels_res:
-            self.channels = {c["index"]: c for c in channels_res["channels"]}
+        try:
+            channels_res = fetch_all_pages(bridge, protocol.CMD_CHANNEL_LIST, "channels")
+            if isinstance(channels_res, dict) and "channels" in channels_res:
+                self.channels = {c["index"]: c for c in channels_res["channels"] if "index" in c}
+        except Exception:
+            pass
 
         self.is_synced = True
 

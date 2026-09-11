@@ -1,4 +1,5 @@
 import pytest
+pyflp = pytest.importorskip("pyflp")
 import os
 from unittest.mock import patch, MagicMock
 from fl_studio_mcp.pie.project_hacker import ProjectHackerEngine

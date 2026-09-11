@@ -3,6 +3,7 @@ import numpy as np
 from fl_studio_mcp.pie.digital_ear import DigitalEarEngine
 
 def test_digital_ear_masking():
+    pytest.importorskip("librosa")
     # Use a non-default port so tests don't bind clash if running multiple times
     engine = DigitalEarEngine(port=9999)
 
@@ -23,6 +24,7 @@ def test_digital_ear_masking():
     assert 80 <= res["conflict_zone_hz"][1] <= 130
 
 def test_digital_ear_lufs():
+    pytest.importorskip("pyloudnorm")
     engine = DigitalEarEngine(port=9998)
 
     # Generate a loud 440Hz wave

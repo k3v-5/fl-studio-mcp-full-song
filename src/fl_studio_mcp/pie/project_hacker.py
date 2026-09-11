@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import os
 import shutil
-import pyflp
 from typing import Any
+
+try:
+    import pyflp
+except ImportError:
+    pyflp = None
 
 class ProjectHackerEngine:
     def __init__(self) -> None:
@@ -36,6 +40,9 @@ class ProjectHackerEngine:
         """Read the .flp binary and extract high-level info."""
         if not self.active_project_path:
             return {"error": "No active project set."}
+
+        if pyflp is None:
+            return {"error": "pyflp is not installed. Install with: pip install pyflp"}
 
         try:
             # Parse the binary FLP
@@ -65,6 +72,13 @@ class ProjectHackerEngine:
                 "total_patterns": len(patterns_info)
             }
 
+        except (PermissionError, OSError) as e:
+            if "Permission denied" in str(e) or "sharing violation" in str(e).lower() or getattr(e, "errno", None) in (13, 32):
+                return {
+                    "error": f"Project file '{self.active_project_path}' is locked by FL Studio. "
+                             "Please save the project (Ctrl+S) in FL Studio or work with a copy before inspecting the binary."
+                }
+            return {"error": f"Failed to access FLP file: {str(e)}"}
         except Exception as e:
             return {"error": f"Failed to parse FLP: {str(e)}"}
 
@@ -74,6 +88,9 @@ class ProjectHackerEngine:
             return {"error": "No active project set."}
 
         backup = self.create_backup()
+
+        if pyflp is None:
+            return {"error": "pyflp is not installed. Install with: pip install pyflp"}
 
         try:
             project = pyflp.parse(self.active_project_path)

@@ -1,158 +1,209 @@
-"""Transport control tools for FL Studio."""
+"""Transport tools — Phase 0 / Phase 1.
+
+Maps the FL Studio ``transport`` and ``mixer`` (for tempo) modules to MCP tools.
+Tempo lives on the mixer module in FL's API, but musicians think of it as a
+transport concept so we expose it here for discoverability.
+"""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Annotated
 
-if TYPE_CHECKING:
-    from fastmcp import FastMCP
+from fastmcp import FastMCP
+from pydantic import Field
+
+from .. import protocol
+from ..connection import FLCommandFailed, FLNotRunning, FLTimeout, get_bridge
 
 
-def register_transport_tools(mcp: FastMCP) -> None:
-    """Register transport control tools with the MCP server."""
-    from fl_studio_mcp.utils.connection import get_connection
+def register(mcp: FastMCP) -> None:
+    """Attach every tool in this module to the given FastMCP instance."""
 
-    @mcp.tool()
-    def fl_play() -> str:
-        """Start or pause FL Studio playback.
+    @mcp.tool(
+        annotations={
+            "title": "Ping FL Studio",
+            "readOnlyHint": True,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
+    def fl_ping() -> dict:
+        """Check that FL Studio is running and the controller script is loaded.
 
-        Toggles between play and pause states. If stopped, starts playback.
-        If playing, pauses playback.
+        Returns the controller's reported FL Studio version, the age of the
+        last heartbeat in seconds, and the MIDI port names in use. Call this
+        first when something seems wrong.
         """
-        conn = get_connection()
-        result = conn.send_command("transport.start")
-
-        if not result.get("success", False) and "error" in result:
-            return f"Error: {result['error']}"
-
-        is_playing = result.get("is_playing", False)
-        return f"Playback {'started' if is_playing else 'paused'}"
-
-    @mcp.tool()
-    def fl_stop() -> str:
-        """Stop FL Studio playback completely.
-
-        Stops playback and resets the playback position.
-        """
-        conn = get_connection()
-        result = conn.send_command("transport.stop")
-
-        if not result.get("success", False) and "error" in result:
-            return f"Error: {result['error']}"
-
-        return "Playback stopped"
-
-    @mcp.tool()
-    def fl_record() -> str:
-        """Toggle recording mode in FL Studio.
-
-        When enabled, incoming MIDI and audio will be recorded.
-        """
-        conn = get_connection()
-        result = conn.send_command("transport.record")
-
-        if not result.get("success", False) and "error" in result:
-            return f"Error: {result['error']}"
-
-        is_recording = result.get("is_recording", False)
-        return f"Recording {'enabled' if is_recording else 'disabled'}"
-
-    @mcp.tool()
-    def fl_get_transport_status() -> dict:
-        """Get current transport status including playback and recording state.
-
-        Returns information about whether FL Studio is playing, recording,
-        the current position, and loop mode.
-        """
-        conn = get_connection()
-        result = conn.send_command("transport.getStatus")
-
-        if not result.get("success", False) and "error" in result:
-            return {"error": result["error"]}
-
+        bridge = get_bridge()
+        port_info = {
+            "port_to_fl": protocol.port_to_fl_name(),
+            "port_from_fl": protocol.port_from_fl_name(),
+        }
+        age = bridge.heartbeat_age()
+        if age is None:
+            if hasattr(bridge, "wait_for_heartbeat"):
+                bridge.wait_for_heartbeat(timeout=1.5)
+            age = bridge.heartbeat_age()
+        if age is None:
+            return {
+                "alive": False,
+                "reason": "No heartbeat received. FL Studio is closed, the "
+                          "FLStudioMCP controller is not selected, or the "
+                          "loopMIDI / IAC output port number does not match "
+                          "the input port number in FL's MIDI Settings.",
+                **port_info,
+            }
+        if age > protocol.HEARTBEAT_STALE_SECONDS:
+            return {
+                "alive": False,
+                "reason": f"Heartbeat is {age:.1f}s old (stale > "
+                          f"{protocol.HEARTBEAT_STALE_SECONDS:.0f}s). FL may "
+                          f"be frozen or the controller stopped responding.",
+                "heartbeat_age_seconds": round(age, 2),
+                **port_info,
+            }
+        # Round-trip a ping so we also confirm the request path is healthy.
+        data = bridge.call(protocol.CMD_PING)
         return {
-            "is_playing": result.get("is_playing", False),
-            "is_recording": result.get("is_recording", False),
-            "position": result.get("position", ""),
-            "loop_mode": result.get("loop_mode", "pattern"),
+            "alive": True,
+            "heartbeat_age_seconds": round(age, 2),
+            **port_info,
+            **data,
         }
 
-    @mcp.tool()
-    def fl_set_song_position(position: float, mode: int = 2) -> str:
-        """Set the playback position in FL Studio.
+    @mcp.tool(
+        annotations={
+            "title": "Get tempo (BPM)",
+            "readOnlyHint": True,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
+    def fl_get_tempo() -> dict:
+        """Return the current FL Studio project tempo in beats per minute."""
+        data = _safe_call(protocol.CMD_GET_TEMPO)
+        return {"bpm": data["bpm"]}
 
-        Args:
-            position: The position value. Interpretation depends on mode.
-            mode: Position format:
-                  0 = Percentage (0.0 to 1.0)
-                  1 = Time in milliseconds
-                  2 = Time in seconds (default)
-                  3 = Position in ticks
-                  4 = Position as bars:steps:ticks (encoded)
-        """
-        conn = get_connection()
-        result = conn.send_command("transport.setPosition", {
-            "position": position,
-            "mode": mode,
-        })
+    @mcp.tool(
+        annotations={
+            "title": "Set tempo (BPM)",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
+    def fl_set_tempo(
+        bpm: Annotated[float, Field(ge=10.0, le=999.0, description="Target tempo in BPM, FL accepts 10-999.")],
+    ) -> dict:
+        """Set the FL Studio project tempo. Range is 10-999 BPM (FL's own limits)."""
+        data = _safe_call(protocol.CMD_SET_TEMPO, {"bpm": float(bpm)})
+        return {"bpm": data["bpm"]}
 
-        if not result.get("success", False) and "error" in result:
-            return f"Error: {result['error']}"
+    @mcp.tool(
+        annotations={
+            "title": "Play",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
+    def fl_play() -> dict:
+        """Start playback. Idempotent — calling while already playing is a no-op."""
+        return _safe_call(protocol.CMD_PLAY)
 
-        new_pos = result.get("position", "")
-        return f"Position set to {new_pos}"
+    @mcp.tool(
+        annotations={
+            "title": "Stop",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
+    def fl_stop() -> dict:
+        """Stop playback. Idempotent."""
+        return _safe_call(protocol.CMD_STOP)
 
-    @mcp.tool()
-    def fl_get_song_length() -> dict:
-        """Get the total length of the current song/pattern.
+    @mcp.tool(
+        annotations={
+            "title": "Toggle play",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+    )
+    def fl_toggle_play() -> dict:
+        """Toggle between play and stop, mirroring the spacebar in FL."""
+        return _safe_call(protocol.CMD_TOGGLE_PLAY)
 
-        Returns the length in multiple formats for convenience.
-        """
-        conn = get_connection()
-        result = conn.send_command("transport.getLength")
+    @mcp.tool(
+        annotations={
+            "title": "Toggle record",
+            "readOnlyHint": False,
+            "destructiveHint": True,  # Recording can overwrite material.
+            "idempotentHint": False,
+            "openWorldHint": True,
+        },
+    )
+    def fl_record() -> dict:
+        """Toggle FL Studio's record-arm state."""
+        return _safe_call(protocol.CMD_RECORD)
 
-        if not result.get("success", False) and "error" in result:
-            return {"error": result["error"]}
+    @mcp.tool(
+        annotations={
+            "title": "Get play state",
+            "readOnlyHint": True,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
+    def fl_get_play_state() -> dict:
+        """Return whether FL is currently playing and / or recording."""
+        return _safe_call(protocol.CMD_GET_PLAY_STATE)
 
-        return {
-            "ticks": result.get("ticks", 0),
-            "seconds": result.get("seconds", 0),
-            "milliseconds": result.get("milliseconds", 0),
-        }
+    @mcp.tool(
+        annotations={
+            "title": "Get song position (beats)",
+            "readOnlyHint": True,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
+    def fl_get_song_position() -> dict:
+        """Return the current playhead position in beats from the song start."""
+        return _safe_call(protocol.CMD_GET_SONG_POS)
 
-    @mcp.tool()
-    def fl_set_loop_mode(mode: str) -> str:
-        """Set the loop mode between pattern and song.
+    @mcp.tool(
+        annotations={
+            "title": "Set song position (beats)",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
+    def fl_set_song_position(
+        beats: Annotated[float, Field(ge=0.0, description="Position in beats from song start.")],
+    ) -> dict:
+        """Move the playhead to the given beat position."""
+        return _safe_call(protocol.CMD_SET_SONG_POS, {"beats": float(beats)})
 
-        Args:
-            mode: Either "pattern" or "song"
-        """
-        if mode not in ("pattern", "song"):
-            return "Error: mode must be 'pattern' or 'song'"
 
-        conn = get_connection()
-        result = conn.send_command("transport.setLoopMode", {"mode": mode})
-
-        if not result.get("success", False) and "error" in result:
-            return f"Error: {result['error']}"
-
-        return f"Loop mode set to {mode}"
-
-    @mcp.tool()
-    def fl_set_playback_speed(speed: float) -> str:
-        """Set the playback speed multiplier.
-
-        Args:
-            speed: Speed multiplier from 0.25 (quarter speed) to 4.0 (4x speed).
-                   1.0 is normal speed.
-        """
-        if not 0.25 <= speed <= 4.0:
-            return "Error: Speed must be between 0.25 and 4.0"
-
-        conn = get_connection()
-        result = conn.send_command("transport.setPlaybackSpeed", {"speed": speed})
-
-        if not result.get("success", False) and "error" in result:
-            return f"Error: {result['error']}"
-
-        return f"Playback speed set to {speed}x"
+def _safe_call(command: str, params: dict | None = None):
+    """Call the bridge and translate transport errors into MCP-friendly messages."""
+    try:
+        return get_bridge().call(command, params)
+    except FLNotRunning as e:
+        # FL not running is the single most common failure mode. Surface it
+        # clearly so the LLM can prompt the user to start FL rather than
+        # retrying blindly.
+        raise RuntimeError(str(e)) from e
+    except FLTimeout as e:
+        raise RuntimeError(
+            f"{e}. Try fl_ping to confirm the controller is alive."
+        ) from e
+    except FLCommandFailed as e:
+        raise RuntimeError(f"FL Studio rejected the command: {e}") from e

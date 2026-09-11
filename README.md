@@ -1,487 +1,212 @@
-# FL Studio MCP Server
+# flstudio-mcp
 
-An MCP (Model Context Protocol) server that enables AI assistants to control FL Studio through MIDI communication and Piano Roll scripts.
+**Control FL Studio with Claude: AI mixing, composition, and mix diagnosis through natural language.**
 
-### Quick Demo
-dont mind the scuffed audio, i had to clip with my mic bc apple wouldnt let me record desktop audio lol
+![version](https://img.shields.io/badge/version-1.0.0-blue)
+![status](https://img.shields.io/badge/status-beta-yellow)
+![license](https://img.shields.io/badge/license-MIT-green)
+![python](https://img.shields.io/badge/python-3.10+-blue)
+![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue)
+![FL Studio](https://img.shields.io/badge/FL%20Studio-2025%2B-orange)
 
-https://github.com/user-attachments/assets/d4fc668f-9fe5-4ab4-9f18-76cd661029c6
+![Claude diagnosing and fixing a mix in FL Studio](docs/demo.gif)
 
-### Original Audio
-If you wanted to hear the better audio
+*Claude diagnosing and fixing a mix in FL Studio through natural language.*
 
-https://github.com/user-attachments/assets/c2b1a5e7-1640-41fa-82bc-18ca7cbae9e8
+## Overview
 
-## Features
+flstudio-mcp is a Model Context Protocol (MCP) server that lets Claude Desktop drive FL Studio 2025 directly — the mixer, plugins, piano roll, routing, and project — from plain-language requests. Ask for a mix diagnosis, a vocal chain, a chord progression in a particular scale, or a full arrangement, and Claude carries it out through FL's scripting API and a set of calibrated, safety-checked tools.
 
-### Transport Control
+It is genre- and producer-agnostic: nothing about it assumes a particular style of music.
 
-- Play, pause, stop playback
-- Toggle recording
-- Set playback position
-- Get song length and position
-- Control loop mode (pattern/song)
-- Adjust playback speed
+## Quickstart
 
-### Mixer Control
+```bat
+scripts\install_windows.bat        :: controller + server + note bridge
+fl-studio-mcp-daemon               :: start the bridge, keep it running
+```
 
-- Get/set track volume and pan
-- Mute/solo tracks
-- Arm tracks for recording
-- Set track names and colors
-- Stereo separation control
+```bash
+./scripts/install_macos.sh         # macOS: controller + server + note bridge
+fl-studio-mcp-daemon               # start the bridge, keep it running
+```
 
-### Channel Rack Control
+Wire the two virtual MIDI ports in FL (loopMIDI on Windows, IAC Driver on
+macOS), arm `MCP_Apply` once in the piano roll, then ask Claude in plain
+language:
 
-- List all channels
-- Get/set channel properties (volume, pan, name, color)
-- Mute/solo channels
-- Route channels to mixer tracks
-- Trigger MIDI notes in real-time
-- Step sequencer control (get/set grid bits)
+> "Scan my mix and tell me what's wrong." — "Set up a vocal chain from my plugins." — "Export this arrangement to MIDI."
 
-### Plugin Control
+Full setup is below.
 
-- List plugin parameters
-- Get/set parameter values
-- Navigate presets (next/previous)
-- Query plugin info
+## Capabilities
 
-### Piano Roll Control
+### Mixing & diagnosis
+- **Mix Doctor** — scans the whole mix and reports concrete problems (clipping, low headroom, level imbalance, missing high-pass, ungrouped related tracks, overlapping EQ boosts), each with the exact evidence and a proposed fix. Fixes are applied one at a time, only on approval, through a snapshot → write → readback → rollback safety layer. Master clipping is resolved by trimming the contributing source tracks rather than pulling the master.
+- **Full-song peak watch** — holds a running peak per track across playback, so level decisions are based on the loudest moment of the actual song, not a single instant.
+- **Calibrated processing intents** — musical EQ, compression, reverb, and delay moves mapped to real plugin parameters (native and third-party), each applied as one reversible change.
+- **Level-aware compression** — sets thresholds relative to a track's measured level during playback.
+- **Gain staging** — proposes per-track trims toward a healthy level with proper master headroom.
+- **Reference match** — compares your mix's level and tonal balance against a reference track.
+- **Bulk track control** — solo or mute a whole group (drums, vocals, …) in one step, with a one-call reset.
+- **Track & channel coloring** — color a track, a channel, or a whole group (drums, vocals, …) by color name or hex, reversible like every other change.
 
-- **Add notes** to the piano roll with precise timing
-- **Add chords** with a single command
-- **Delete specific notes** by MIDI number and time
-- **Clear all notes** from the piano roll
-- **Read piano roll state** to see all existing notes
-- Auto-triggering via keystroke (Cmd+Opt+Y on macOS, Ctrl+Alt+Y on Windows)
+### Plugin & preset control
+- Read and set plugin parameters by name, on native and third-party plugins (the parameter list is resolved live).
+- **Chain suggestions** and **preset recommendations** drawn from your actual installed library — read directly from FL's plugin database and preset folders on disk, so recommendations are limited to what you own.
 
-## Important Limitations
+### Music Theory, Pattern Generation & Producers
+- **Music Theory & Chord Voicings** — scale suggestion by mood/genre, Roman numeral chord progressions, octave-spanning scale notes, and tempo-aware drum and bassline generators with microtiming and humanize.
+- **13 Legendary Producer Profiles** — deep gear breakdowns, swing profiles, sampling techniques, and replication tips (DJ Premier, Pete Rock, J Dilla, RZA, 9th Wonder, Madlib, Havoc, Large Professor, Alchemist, Hi-Tek, Buckwild, Lord Finesse, Marley Marl).
+- **Comprehensive VST Guides** — exact parameter presets and masterclass workflows for iZotope Ozone 12, FabFilter (Pro-Q 4, Pro-C 3, Saturn 2), Xfer Serum 2, Cymatics, Antares Auto-Tune Pro, iZotope RX 11, and Soundtoys.
+- **Sample Library Indexer** — ultra-fast tag search across your sample packs by type, genre, mood, key, and BPM with Parquet and JSON storage.
+- **Learned Context & Pattern Memory** — save favorite patterns and learn user preferences over time.
 
-### Cannot Load Plugins
+### Production Intelligence Engine (PIE)
+- **Shadow Graph & Role Topology** — track-role awareness (kick, sub, bass, lead, vocal, etc.) with real-time state mirroring.
+- **Digital Ear** — offline acoustic analysis with loudness targets (LUFS, true peak) and dynamic range auditing.
+- **Project Hacker** — deep direct `.flp` binary project inspection via PyFLP.
+- **Governance & Safe Rollback** — strict transactional boundaries preventing destructive DAW actions.
 
-The FL Studio scripting API does **not** support loading new VST/AU plugins. You can only control parameters of plugins that are already loaded in your project.
+The server exposes **173 tools** across 24 modular categories, plus live resources that Claude can read directly.
 
-### Cannot Create Patterns
+## What sets it apart
 
-There is no API to programmatically create new patterns. You can only work with existing patterns.
+flstudio-mcp is the ultimate AI music production and engineering co-pilot. It combines low-latency SysEx execution in FL Studio, transactional rollback safety, deep acoustic analysis (Mix Doctor & Digital Ear), an extensive knowledge base across theory and top VSTs, and an ultra-fast sample search indexer. Every change that touches the project is shown before it is applied, logged, and reversible.
+
+## Limitations
+
+These are properties of FL Studio's scripting API, stated plainly:
+
+- **Plugins, audio files, and rendering are UI-only.** FL's API cannot load a plugin, load an audio file, or render audio. The plugin and preset tools therefore *suggest* — you load the chosen plugin or preset, and Claude then configures it. Audio export is done manually (File > Export); Claude can analyze the rendered file afterward.
+- **Note writing is armed once per session.** A generated pyscript writes notes into the piano roll; FL exposes no API to run a pyscript, so you run "MCP_Apply" once from the piano roll's scripting menu at the start of a session.
+- **Micro-tonal and gamaka-heavy music is approximated.** Scales with intervals smaller than a semitone (e.g. Arabic maqam) are rounded to the nearest semitone, and traditions built on gamaka/ornamentation (e.g. Carnatic) get the *scale framework* — the correct swaras and intervals — not gamaka or micro-tonal rendering. That's a limit of 12-tone MIDI, not of the tools.
 
 ## Requirements
 
-- **FL Studio 20.7+** (MIDI Controller Scripting API)
+- **Windows 10/11** (tested on Windows 11) or **macOS**
+- **FL Studio 2025** or newer
+- **Claude Desktop** (or any MCP client)
 - **Python 3.10+**
-- **macOS** or **Windows**
-  - macOS: IAC Driver (built-in, needs to be enabled)
-  - Windows: [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html)
-
-## Which AI Clients Work With This?
-
-This is a standard [MCP](https://modelcontextprotocol.io) server that talks to clients over stdio — it isn't hardcoded to any one AI vendor. In principle, **any MCP-compatible client can connect**: Claude Desktop, Claude Code, Cursor, Windsurf, Gemini CLI/Gemini's MCP support, OpenAI's Codex CLI/Agents SDK MCP support, etc.
-
-**What's actually tested and auto-configured:** only **Claude Desktop** and **Claude Code**, via `scripts/install_mcp_for_claude.sh` (macOS/Linux) and `scripts/install_mcp_for_claude.ps1` (Windows). Other clients (Gemini, OpenAI-based tools, etc.) are not tested against this server and have no installer support — you'd need to manually add an equivalent MCP server entry to that client's own config, pointing at:
-
-```json
-{
-  "command": "uv",
-  "args": ["run", "--directory", "/path/to/fl-studio-mcp", "fl-studio-mcp"]
-}
-```
-
-(adjust `/path/to/fl-studio-mcp` to your local clone). If you try this with a non-Claude client, please open an issue with what worked/didn't — the protocol should support it, but it hasn't been verified here.
-
-## Quick Installation
-
-The easiest way to install is using the provided setup script for your platform.
-
-### macOS / Linux
-
-```bash
-# Clone the repository
-git clone https://github.com/karl-andres/fl-studio-mcp.git
-cd fl-studio-mcp
-
-# Run the one-command installer
-./install.sh
-```
-
-### Windows
-
-```powershell
-# Clone the repository
-git clone https://github.com/karl-andres/fl-studio-mcp.git
-cd fl-studio-mcp
-
-# Allow running local scripts for this user (one-time)
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
-
-# Run the one-command installer
-.\install.ps1
-```
-
-`install.ps1` is the Windows counterpart to `install.sh` — same steps, PowerShell instead of bash, and it installs Python 3.12 specifically (required for prebuilt `python-rtmidi` wheels on Windows).
-
-Both installers will:
-
-1. Install [uv](https://github.com/astral-sh/uv) if not present
-2. Install Python dependencies
-3. Guide you through enabling virtual MIDI ports (IAC Driver on Mac, loopMIDI on Windows)
-4. Install the FL Studio MIDI controller script
-5. Install the Piano Roll script (ComposeWithLLM)
-6. Configure Claude Desktop or Claude Code automatically (`scripts/install_mcp_for_claude.sh` / `scripts/install_mcp_for_claude.ps1`)
-
-> **Windows piano-roll auto-trigger note:** the Piano Roll script is launched by sending FL Studio a keystroke (`Ctrl+Alt+Y`). On Windows this requires briefly foregrounding the FL Studio window, so **FL Studio will pop to the front for a moment** each time a tool like `fl_send_notes` runs. This is expected. See [Piano Roll script not triggering](#piano-roll-script-not-triggering) if it doesn't fire at all.
-
-## Manual Installation
-
-### 1. Install Python Dependencies
-
-```bash
-# Using uv (recommended)
-uv sync
-
-# Or using pip
-pip install -e .
-```
-
-### 2. Enable Virtual MIDI Ports
-
-#### macOS (IAC Driver)
-
-1. Open **Audio MIDI Setup** (search in Spotlight)
-2. Press **Cmd+2** or go to **Window > Show MIDI Studio**
-3. Double-click on **IAC Driver**
-4. Check **"Device is online"**
-5. Click **Apply**
-
-#### Windows (loopMIDI)
-
-1. Download and install [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html)
-2. Create a virtual port (any name works)
-3. Keep loopMIDI running while using FL Studio
-
-### 3. Install FL Studio Scripts
-
-Copy the controller script to FL Studio's Hardware folder:
-
-```bash
-# macOS
-mkdir -p ~/Documents/Image-Line/FL\ Studio/Settings/Hardware/FLStudioMCP
-cp fl_controller/device_FLStudioMCP.py ~/Documents/Image-Line/FL\ Studio/Settings/Hardware/FLStudioMCP/
-
-# Windows
-mkdir "%USERPROFILE%\Documents\Image-Line\FL Studio\Settings\Hardware\FLStudioMCP"
-copy fl_controller\device_FLStudioMCP.py "%USERPROFILE%\Documents\Image-Line\FL Studio\Settings\Hardware\FLStudioMCP\"
-```
-
-Copy the Piano Roll script:
-
-```bash
-# macOS
-cp scripts/ComposeWithLLM.pyscript ~/Documents/Image-Line/FL\ Studio/Settings/Piano\ roll\ scripts/
-
-# Windows
-copy scripts\ComposeWithLLM.pyscript "%USERPROFILE%\Documents\Image-Line\FL Studio\Settings\Piano roll scripts\"
-```
-
-### 4. Configure FL Studio
-
-1. **Restart FL Studio** (if it's running)
-2. Go to **Options > MIDI Settings**
-3. Under **Input**, find your virtual MIDI port (e.g., "IAC Driver Bus 1")
-4. Set the **Controller type** to **FLStudioMCP**
-5. Enable the port (click to highlight it)
-
-### 5. Configure Claude (or another MCP client)
-
-Add to your Claude Desktop config:
-
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "fl-studio": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/fl-studio-mcp", "fl-studio-mcp"]
-    }
-  }
-}
-```
-
-Or for Claude Code, add to your MCP settings (`~/.claude.json`, or run `claude mcp add`).
-
-Using a different MCP-compatible client (Gemini, an OpenAI-based tool, Cursor, etc.)? The same `command`/`args` pair above is all any MCP host needs — add it to that client's own MCP config in whatever format it expects. See [Which AI Clients Work With This?](#which-ai-clients-work-with-this) for what's actually been tested.
-
-## Usage
-
-### Running the Server Manually
-
-```bash
-# Using uv
-uv run fl-studio-mcp
-
-# Or after installation
-fl-studio-mcp
-```
-
-### Piano Roll Workflow
-
-1. Open FL Studio and select a channel
-2. Open the Piano Roll (F7 or double-click the channel)
-3. The first time, manually run the script: **Tools > Scripting > ComposeWithLLM**
-4. After that, the MCP tools will auto-trigger the script
-
-## Available Tools
-
-### Connection
-
-| Tool | Description |
-|------|-------------|
-| `fl_connect` | Connect/reconnect to FL Studio |
-| `fl_connection_status` | Get connection status |
-
-### Transport
-
-| Tool | Description |
-|------|-------------|
-| `fl_play` | Start/pause playback |
-| `fl_stop` | Stop playback |
-| `fl_record` | Toggle recording |
-| `fl_get_transport_status` | Get playback/recording state |
-| `fl_set_song_position` | Set playback position |
-| `fl_get_song_length` | Get song duration |
-| `fl_set_loop_mode` | Switch between pattern/song mode |
-| `fl_set_playback_speed` | Adjust playback speed (0.25x-4x) |
-
-### Mixer
-
-| Tool | Description |
-|------|-------------|
-| `fl_get_mixer_track_count` | Get number of mixer tracks |
-| `fl_get_mixer_track_info` | Get track details |
-| `fl_get_all_mixer_tracks` | List all tracks |
-| `fl_set_track_volume` | Set track volume |
-| `fl_set_track_pan` | Set track pan |
-| `fl_mute_track` | Mute/unmute track |
-| `fl_solo_track` | Solo/unsolo track |
-| `fl_arm_track` | Arm track for recording |
-| `fl_set_track_name` | Rename track |
-| `fl_set_track_color` | Set track color |
-| `fl_set_stereo_separation` | Adjust stereo width |
-
-### Channels
-
-| Tool | Description |
-|------|-------------|
-| `fl_get_channel_count` | Get number of channels |
-| `fl_get_channel_info` | Get channel details |
-| `fl_get_all_channels` | List all channels |
-| `fl_get_selected_channel` | Get selected channel |
-| `fl_select_channel` | Select/deselect channel |
-| `fl_select_one_channel` | Select channel exclusively |
-| `fl_trigger_note` | Trigger MIDI note (real-time) |
-| `fl_set_channel_volume` | Set channel volume |
-| `fl_set_channel_pan` | Set channel pan |
-| `fl_mute_channel` | Mute/unmute channel |
-| `fl_solo_channel` | Solo/unsolo channel |
-| `fl_set_channel_name` | Rename channel |
-| `fl_set_channel_color` | Set channel color |
-| `fl_route_channel_to_mixer` | Route to mixer track |
-| `fl_get_grid_bit` | Get step sequencer step |
-| `fl_set_grid_bit` | Set step sequencer step |
-| `fl_get_step_sequence` | Get full pattern |
-| `fl_set_step_sequence` | Set full pattern |
-
-### Plugins
-
-| Tool | Description |
-|------|-------------|
-| `fl_is_plugin_valid` | Check if plugin exists |
-| `fl_get_plugin_name` | Get plugin name |
-| `fl_get_plugin_param_count` | Get parameter count |
-| `fl_get_plugin_params` | List all parameters |
-| `fl_get_plugin_param_value` | Get parameter value |
-| `fl_set_plugin_param_value` | Set parameter value |
-| `fl_get_preset_count` | Get preset count |
-| `fl_next_preset` | Next preset |
-| `fl_prev_preset` | Previous preset |
-| `fl_get_plugin_color` | Get plugin color |
-
-### Piano Roll
-
-| Tool | Description |
-|------|-------------|
-| `fl_send_notes` | Add notes to the piano roll |
-| `fl_send_chord` | Add a chord (multiple notes at same time) |
-| `fl_delete_notes` | Delete specific notes |
-| `fl_clear_piano_roll` | Clear all notes |
-| `fl_get_piano_roll_state` | Read current piano roll notes |
-| `fl_trigger_script` | Manually trigger the FL Studio script |
-| `fl_get_piano_roll_info` | Get piano roll system info |
-| `fl_clear_request_queue` | Cancel pending queued changes |
-
-## Example Workflows
-
-### Adjusting a Mix
-
-```text
-"Set the volume of mixer track 1 to 80% and pan it slightly left"
-```
-
-### Creating a Drum Pattern
-
-```text
-"Create a basic kick pattern on channel 0 with kicks on steps 0, 4, 8, and 12"
-```
-
-### Adding a Melody to Piano Roll
-
-```text
-"Add a C major arpeggio starting at beat 0: C4, E4, G4, C5 - each note quarter duration"
-```
-
-### Adding Chords
-
-```text
-"Add a C major chord at beat 0, then F major at beat 2, then G major at beat 4"
-```
-
-### Automating Plugin Parameters
-
-```text
-"List the parameters of the plugin on channel 0 and set the filter cutoff to 50%"
-```
+- Virtual MIDI ports:
+  - Windows: **loopMIDI** ([download](https://www.tobias-erichsen.de/software/loopmidi.html))
+  - macOS: the built-in **IAC Driver**
+- Optional: **ffmpeg** on PATH (for MP3 analysis)
+
+Linux is not yet supported — contributions welcome.
+
+## Setup
+
+1. **Create two virtual MIDI ports**, named exactly `FLStudioMCP RX` and
+   `FLStudioMCP TX`.
+
+   Windows: create both ports in loopMIDI.
+
+   macOS:
+   - Open **Audio MIDI Setup**.
+   - Choose **Window > Show MIDI Studio**.
+   - Double-click **IAC Driver**.
+   - Enable **Device is online**.
+   - Create or rename two ports exactly:
+     - `FLStudioMCP RX`
+     - `FLStudioMCP TX`
+
+2. **Install the controller script and server:**
+
+   Windows:
+   ```bat
+   git clone https://github.com/rosasynthesiz/flstudio-mcp
+   cd flstudio-mcp
+   scripts\install_windows.bat
+   ```
+
+   macOS:
+   ```bash
+   git clone https://github.com/rosasynthesiz/flstudio-mcp
+   cd flstudio-mcp
+   chmod +x scripts/install_macos.sh
+   ./scripts/install_macos.sh
+   ```
+
+   This copies the controller script, seeds the note-bridge pyscript
+   (`MCP_Apply`), installs the server, and checks that your virtual MIDI ports
+   exist. For audio features, add the optional extras:
+   ```
+   pip install -e ".[audio]"
+   pip install -e ".[audio,audio-accurate]"
+   ```
+
+3. **Configure FL Studio** — Options > MIDI Settings:
+   - Enable `FLStudioMCP RX` as an **input**, set its controller type to **FLStudioMCP**, and give it a port number.
+   - Enable `FLStudioMCP TX` as an **output** with the **same** port number.
+   - View > Script output should show `[FLStudioMCP] Ready`.
+
+4. **Start the bridge daemon** (recommended) so the MIDI port is held by a stable process:
+   ```bat
+   fl-studio-mcp-daemon
+   ```
+
+5. **Register the server with Claude Desktop**:
+
+   Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+   macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+   ```json
+   {
+     "mcpServers": {
+       "fl-studio": {
+         "command": "fl-studio-mcp",
+         "env": { "FLSTUDIO_MCP_TRANSPORT": "tcp" }
+       }
+     }
+   }
+   ```
+   `tcp` routes through the daemon, which works regardless of how Claude Desktop launches the server. Omit the env var to let the server open the MIDI ports directly instead.
+
+6. **Arm the note bridge (per session)** — open the piano roll and run **MCP_Apply** once from its scripting menu, so note-writing works.
+
+   On macOS, the note bridge re-triggers the armed script with `Cmd+Opt+Y`.
+   Grant Accessibility permission to the app running the MCP server or daemon,
+   for example Terminal, iTerm, Claude Desktop, or Cursor:
+   **System Settings > Privacy & Security > Accessibility**.
+
+Verify the connection by asking Claude to call `fl_ping`.
 
 ## Troubleshooting
 
-### "Not connected to FL Studio"
+| Symptom | Fix |
+|---|---|
+| Virtual MIDI ports not found / not detected | The two ports must be named **exactly** `FLStudioMCP RX` and `FLStudioMCP TX`. Recreate them in loopMIDI (Windows) or IAC Driver (macOS), then re-run the installer. |
+| No `[FLStudioMCP] Ready` in FL's Script output | The controller isn't registered: set the `FLStudioMCP RX` input's **Controller type** to **FLStudioMCP** in MIDI Settings, confirm `device_FLStudioMCP.py` is in `Settings\Hardware\FLStudioMCP\`, then fully restart FL Studio. |
+| Claude can't reach FL / `fl_ping` fails | Make sure the daemon is running (`fl-studio-mcp-daemon`); check the transport matches (`FLSTUDIO_MCP_TRANSPORT=tcp` uses the daemon, unset uses direct MIDI); restart Claude Desktop after editing its config. |
+| Note-writing does nothing | Run `MCP_Apply` once from the piano roll's scripting menu this session — it arms the note bridge. |
+| macOS note-trigger fails | Grant Accessibility permission to the app running the MCP server or daemon, then click the FL Piano roll and try `Cmd+Opt+Y`. |
+| Audio tools error or are unavailable | Install the optional extras: `pip install -e ".[audio]"` (or `".[audio,audio-accurate]"`). |
 
-1. Ensure FL Studio is running
-2. Check that the FLStudioMCP controller is enabled in MIDI Settings
-3. On Mac, verify IAC Driver is enabled in Audio MIDI Setup
-4. On Windows, verify loopMIDI is running
-5. Restart FL Studio after enabling the controller
+## Usage examples
 
-### "Timeout waiting for FL Studio response"
+Plain-language prompts:
 
-1. Make sure FL Studio is in focus
-2. Check the Script output window in FL Studio (View > Script output)
-3. Verify the controller is receiving MIDI (look for activity in MIDI Settings)
-
-### Piano Roll script not triggering
-
-1. First time: manually run **Tools > Scripting > ComposeWithLLM** in FL Studio
-2. On macOS: grant Accessibility permissions when prompted
-3. On Windows: the MCP server foregrounds the FL Studio window automatically before sending the hotkey — if FL Studio isn't running or is minimized to the system tray, the trigger can't find it and will fall back to a warning telling you to press the hotkey manually
-4. Try pressing Cmd+Opt+Y (macOS) or Ctrl+Alt+Y (Windows) manually to confirm the hotkey itself is bound to the script in FL Studio
-5. If you just updated the server code (e.g. pulled a fix to the trigger logic), **fully restart** your MCP client (Claude Desktop/Code) — reconnecting the MCP server alone does not respawn the underlying process, so it can keep running stale code
-
-### No MIDI ports available
-
-- **macOS**: Enable IAC Driver in Audio MIDI Setup
-- **Windows**: Install and run loopMIDI
+- "Scan my mix and tell me what's wrong."
+- "Set up a vocal chain on the lead vocal using my plugins."
+- "Suggest a vintage bass preset from my Serum library."
+- "Compose an 8-bar melody in D Dorian and write it to the selected channel."
+- "Export this arrangement to a MIDI file."
+- "What tempo and key is this track?" (on an audio file)
 
 ## Architecture
 
-This MCP server uses a hybrid approach:
+A thin controller script runs inside FL Studio and returns only cheap, raw data; all judgement — diagnosis, calibration, planning — happens server-side. A standalone daemon owns the MIDI port so the server works regardless of how the MCP client is launched. Note authoring uses a generated pyscript bridge: the daemon re-triggers the armed `MCP_Apply` script with the platform run-last-script shortcut after a brief window force-focus. Every project-modifying tool routes through a snapshot → write → readback → rollback safety layer backed by a persisted change log.
 
-```text
-┌─────────────────┐     ┌─────────────────────────────────────────┐
-│   MCP Client    │────▶│           FastMCP Server                │
-│  (Claude, etc)  │     │                                         │
-└─────────────────┘     │  ┌─────────────────┐  ┌──────────────┐  │
-                        │  │ MIDI + JSON     │  │ Piano Roll   │  │
-                        │  │ Tools           │  │ Tools (JSON) │  │
-                        │  └────────┬────────┘  └──────┬───────┘  │
-                        └───────────┼──────────────────┼──────────┘
-                                    │                  │
-                               MIDI + JSON        JSON Files +
-                                    │              Keystroke
-                                    ▼                  ▼
-                        ┌─────────────────────────────────────────┐
-                        │              FL Studio                   │
-                        │  ┌──────────────┐  ┌──────────────────┐ │
-                        │  │FLStudioMCP   │  │ Piano Roll Script│ │
-                        │  │(MIDI Ctrl)   │  │ (ComposeWithLLM) │ │
-                        │  └──────────────┘  └──────────────────┘ │
-                        └─────────────────────────────────────────┘
-```
-
-### How It Works
-
-1. **Transport/Mixer/Channels/Plugins**:
-   - MCP server writes command to JSON file
-   - Sends MIDI trigger note to FL Studio
-   - FL Studio controller script reads JSON, executes API, writes response
-   - MCP server reads response
-
-2. **Piano Roll**:
-   - MCP server writes note requests to JSON file
-   - Sends keystroke (Cmd+Opt+Y on macOS, Ctrl+Alt+Y on Windows) to trigger FL Studio script — on Windows, the FL Studio window is foregrounded first so the keystroke actually reaches it
-   - Piano Roll script reads JSON and modifies notes
-
-## Development
-
-### Prerequisites
-
-- Python 3.10+
-- [uv](https://github.com/astral-sh/uv) (recommended)
-
-### Setup
-
-```bash
-# Install all dependencies including dev extras
-uv sync --dev
-
-# Or with pip
-pip install -e ".[dev]"
-```
-
-### Available Commands
-
-| Command | Description |
-|---------|-------------|
-| `uv run fl-studio-mcp` | Run the MCP server |
-| `uv run ruff check .` | Lint the codebase |
-| `uv run ruff check --fix .` | Lint and auto-fix |
-| `uv run pytest` | Run tests |
-
-### Project Structure
-
-```
-fl-studio-mcp/
-├── fl_controller/
-│   └── device_FLStudioMCP.py    # FL Studio MIDI controller script (runs inside FL Studio)
-├── scripts/
-│   ├── setup.sh                  # FL Studio script installer
-│   ├── install_mcp_for_claude.sh # Claude config installer (macOS/Linux)
-│   ├── install_mcp_for_claude.ps1 # Claude config installer (Windows)
-│   └── ComposeWithLLM.pyscript   # Piano Roll script (runs inside FL Studio)
-├── src/fl_studio_mcp/
-│   ├── server.py                # FastMCP server entry point
-│   ├── tools/                   # MCP tool implementations
-│   │   ├── channels.py
-│   │   ├── mixer.py
-│   │   ├── piano_roll.py
-│   │   ├── plugins.py
-│   │   └── transport.py
-│   └── utils/
-│       ├── connection.py        # FL Studio connection wrapper
-│       ├── fl_trigger.py        # Piano roll keystroke trigger
-│       └── midi_connection.py   # MIDI + JSON communication layer
-├── install.sh                   # One-command installer (macOS/Linux)
-└── install.ps1                  # One-command installer (Windows)
-```
-
-## Credits
-
-- [FL Studio API Stubs](https://github.com/IL-Group/FL-Studio-API-Stubs) - API documentation
-- [FastMCP](https://github.com/jlowin/fastmcp) - MCP server framework
-- [mido](https://github.com/mido/mido) - MIDI library for Python
-- [calvinw/fl-studio-mcp](https://github.com/calvinw/fl-studio-mcp) - Piano Roll integration approach
-- [Image-Line](https://www.image-line.com/) - FL Studio
+Design notes and findings are in [`docs/`](docs/).
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
+## Status & contributing
+
+Beta — the public 1.0 release. Windows and macOS are supported; Linux contributions are welcome. Issues and pull requests: [github.com/rosasynthesiz/flstudio-mcp](https://github.com/rosasynthesiz/flstudio-mcp).
+
+<!-- mcp-name: io.github.rosasynthesiz/flstudio-mcp -->

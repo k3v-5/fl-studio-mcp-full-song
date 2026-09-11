@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import socket
 import threading
-import numpy as np
-import librosa
-import pyloudnorm as pyln
 from typing import Any
+import numpy as np
 
 class DigitalEarEngine:
     def __init__(self, port: int = 9878) -> None:
@@ -75,6 +73,11 @@ class DigitalEarEngine:
         if len(audio_a) == 0 or len(audio_b) == 0:
             return {"error": "Missing audio data."}
 
+        try:
+            import librosa
+        except ImportError:
+            return {"error": "librosa is not installed. Install with: pip install librosa or pip install -e .[audio]"}
+
         # Compute Short-Time Fourier Transform
         stft_a = np.abs(librosa.stft(audio_a))
         stft_b = np.abs(librosa.stft(audio_b))
@@ -101,6 +104,11 @@ class DigitalEarEngine:
         audio = self.get_audio_array()
         if len(audio) == 0:
             return {"error": "No audio captured in buffer."}
+
+        try:
+            import pyloudnorm as pyln
+        except ImportError:
+            return {"error": "pyloudnorm is not installed. Install with: pip install pyloudnorm"}
 
         # Pyloudnorm expects (samples, channels). Assuming mono for now.
         meter = pyln.Meter(self.sample_rate)
